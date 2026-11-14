@@ -75,6 +75,38 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-installer.ps1 `
   -Installer artifacts\installer\PixelForge-1.0.0-Setup.exe
 ```
 
+### Staged builds for signing
+
+The signed-release workflow builds and signs in two stages so the installer contains the signed application executable.
+
+Publish only:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.0.0 -Stage publish
+```
+
+After `PixelForge.exe` has been signed, package the signed application:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 `
+  -Version 1.0.0 -Stage package -SignedAppPath <path-to-signed-PixelForge.exe>
+```
+
+The package stage verifies that the supplied executable has a valid Authenticode signature from SignPath Foundation before it creates the portable ZIP or installer. The default `-Stage all` still performs an unsigned local build.
+
+### Verify signatures
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-signatures.ps1 `
+  -Path artifacts\release\v1.0.0\PixelForge-Setup-1.0.0-x64.exe
+```
+
+The script requires a valid signature, a signer containing `SignPath Foundation`, and a timestamp countersignature.
+
+### Signed release workflow
+
+[`.github/workflows/release-sign.yml`](../.github/workflows/release-sign.yml) runs on a `v*` tag or manual dispatch. It requires the SignPath secret and variables described in [SIGNPATH.md](SIGNPATH.md), waits for manual approval in SignPath, verifies the signed application and installer, generates checksums after signing, and creates a draft GitHub release. Do not replace the existing unsigned `v1.0.0` assets; use a new version.
+
 ## Repository layout
 
 ```text

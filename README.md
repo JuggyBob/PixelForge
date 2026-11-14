@@ -35,6 +35,7 @@ The installer is per-user and does not require administrator rights. The portabl
 - [Troubleshooting](#troubleshooting)
 - [Privacy and security](#privacy-and-security)
 - [Known limitations](#known-limitations)
+- [Code signing policy](#code-signing-policy)
 - [Contributing](#contributing)
 - [License](#license)
 - [Security reporting](#security-reporting)
@@ -334,7 +335,7 @@ Dense columns, tables with merged cells, seals, handwriting, and decorative layo
 
 All normal processing runs locally. PixelForge does not include telemetry, analytics, or background cloud calls. Network access occurs only when you explicitly download a model or runtime. The llama.cpp advanced-OCR server binds to loopback for the duration of a job.
 
-PixelForge stores settings, queue state, history, logs, and optional models in its local application-data folder. It does not upload media. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+PixelForge stores settings, queue state, history, logs, and optional models in its local application-data folder. It does not upload media. See [PRIVACY.md](PRIVACY.md) for the full privacy policy and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Known limitations
 
@@ -344,7 +345,21 @@ PixelForge stores settings, queue state, history, logs, and optional models in i
 - OCR is page-level reconstruction, not full document-layout analysis; complex forms and handwriting may need review.
 - Video super-resolution uses frame-by-frame AI models; fast motion can show temporal shimmer.
 - DRM-protected e-books are refused; PixelForge does not bypass DRM.
-- The installer is not code-signed. Windows SmartScreen may show a warning.
+- The initial v1.0.0 installer is not code-signed. SignPath Foundation enrollment is in progress; signed releases will follow. Windows SmartScreen may show a warning for the unsigned build.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+| Role | Member |
+|---|---|
+| Author and committer | [JuggyBob](https://github.com/JuggyBob) |
+| Reviewer | [JuggyBob](https://github.com/JuggyBob) |
+| Approver | [JuggyBob](https://github.com/JuggyBob) |
+
+Release builds run on GitHub-hosted runners, are submitted to SignPath, and require manual approval for every signing request. The application executable and the setup executable are Authenticode-signed and timestamped; the executable inside the portable ZIP is signed as well. The certificate is issued to SignPath Foundation, so Windows displays SignPath Foundation as the publisher.
+
+PixelForge 1.0.0 predates enrollment and remains unsigned. Existing release assets will not be replaced; signed binaries will be published in a later version after approval. See [CODE_SIGNING.md](CODE_SIGNING.md) for the complete policy and [docs/SIGNPATH.md](docs/SIGNPATH.md) for the setup and release procedure.
 
 ## Contributing
 

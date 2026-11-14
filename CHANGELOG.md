@@ -2,7 +2,15 @@
 
 All notable changes to PixelForge are documented here. The project follows Semantic Versioning for public releases.
 
-## [1.0.0] — 2026-11-14
+## [Unreleased]
+
+### Added
+
+- SignPath Foundation code-signing workflow for two-stage Authenticode signing: the application executable is signed first, then the installer is rebuilt around it and signed, with checksums generated after signing.
+- Artifact configurations with enforced product name, product version, and file version metadata.
+- Code signing policy and privacy policy documentation.
+
+## [1.0.0] - 2026-11-14
 
 First public release.
 

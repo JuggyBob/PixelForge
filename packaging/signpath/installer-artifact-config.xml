@@ -1,0 +1,15 @@
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="PixelForge-Setup.exe"
+             product-name="PixelForge"
+             product-version="${version}"
+             file-version="${version}"
+             company-name="PixelForge">
+      <authenticode-sign description="PixelForge Setup"
+                         description-url="https://github.com/JuggyBob/PixelForge" />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
