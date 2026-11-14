@@ -1,0 +1,4 @@
+# Correct the email used by the initial public release commit.
+# GitHub attributed that commit to an unrelated account because the commit
+# used a noreply address that did not belong to the maintainer.
+Ivan Bizimoski <283214854+JuggyBob@users.noreply.github.com> JuggyBob <mrbob@users.noreply.github.com>
