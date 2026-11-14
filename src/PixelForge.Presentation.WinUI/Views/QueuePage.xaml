@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.QueuePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid Padding="28,22,28,24" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Processing Queue" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="QueueTitle" />
+                <TextBlock Text="Every conversion and upscale runs locally through one verified queue."
+                           Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <ComboBox ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
+                          DisplayMemberPath="Label" MinWidth="140" AutomationProperties.Name="Queue filter" />
+                <Button Content="Clear finished" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearTerminalCommand}"
+                        AutomationProperties.AutomationId="QueueClearFinished" />
+                <Button Content="History" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding OpenHistoryCommand}"
+                        AutomationProperties.AutomationId="QueueOpenHistory" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Active" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding ActiveCount}" Style="{StaticResource MetricTextStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Completed" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding CompletedCount}" Style="{StaticResource MetricTextStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Failed" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding FailedCount}" Style="{StaticResource MetricTextStyle}" Foreground="{ThemeResource DangerBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Filter" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding SelectedFilter.Label}" Style="{StaticResource CardTitleTextStyle}" FontSize="14" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Border Style="{StaticResource SectionCardStyle}" Visibility="{Binding HasJobs, Converter={StaticResource InverseBoolToVisibility}}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="30">
+                    <Border Background="{ThemeResource SubtleSurfaceBrush}" Width="64" Height="64" CornerRadius="16" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE8FD;" FontSize="28" />
+                    </Border>
+                    <TextBlock Text="Nothing queued" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding EmptyMessage}" Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
+                    <Button Content="Open converter" Style="{StaticResource SecondaryButtonStyle}" Click="OnOpenConverterClick"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <ListView ItemsSource="{Binding VisibleJobs}" SelectionMode="None" Visibility="{Binding HasJobs, Converter={StaticResource BoolToVisibility}}"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.HorizontalScrollMode="Disabled"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" Padding="0">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0,0,0,10" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="IsTabStop" Value="False" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemContainerTransitions>
+                    <TransitionCollection>
+                        <AddDeleteThemeTransition />
+                        <RepositionThemeTransition />
+                    </TransitionCollection>
+                </ListView.ItemContainerTransitions>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource SectionCardStyle}" Padding="16" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{ThemeResource SubtleSurfaceBrush}" Width="40" Height="40" CornerRadius="9" VerticalAlignment="Center">
+                                        <FontIcon Glyph="{Binding IconGlyph}" FontSize="18" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="{Binding OperationText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="{Binding CreatedText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="{Binding ItemCountText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Border Grid.Column="2" Style="{StaticResource StatusPillStyle}" Background="{ThemeResource SubtleSurfaceBrush}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Grid Width="7" Height="7">
+                                                <Ellipse Fill="{ThemeResource AccentPrimaryBrush}" Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
+                                                <Ellipse Fill="{ThemeResource SuccessBrush}" Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibility}}" />
+                                                <Ellipse Fill="{ThemeResource DangerBrush}" Visibility="{Binding IsFailed, Converter={StaticResource BoolToVisibility}}" />
+                                                <Ellipse Fill="{ThemeResource WarningBrush}" Visibility="{Binding IsInterrupted, Converter={StaticResource BoolToVisibility}}" />
+                                                <Ellipse Fill="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding StateText}" FontSize="11" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
+                                                ToolTipService.ToolTip="Open output folder" AutomationProperties.Name="Open output folder">
+                                            <FontIcon Glyph="&#xE8B7;" FontSize="13" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleDetailsCommand}"
+                                                ToolTipService.ToolTip="Show items" AutomationProperties.Name="Show job items">
+                                            <FontIcon Glyph="&#xE70D;" FontSize="12" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CancelCommand}"
+                                                Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibility}}"
+                                                ToolTipService.ToolTip="Cancel job" AutomationProperties.Name="Cancel job">
+                                            <FontIcon Glyph="&#xE711;" FontSize="13" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RetryCommand}"
+                                                Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
+                                                ToolTipService.ToolTip="Retry failed items" AutomationProperties.Name="Retry failed items">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveCommand}"
+                                                Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
+                                                ToolTipService.ToolTip="Remove pending job" AutomationProperties.Name="Remove pending job">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="5" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ProgressText}" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" MinWidth="120" TextAlignment="Right" />
+                                </Grid>
+                                <TextBlock Text="{Binding BatchSummary}" Style="{StaticResource CaptionTextStyle}"
+                                           Visibility="{Binding BatchSummary, Converter={StaticResource StringToVisibility}}" />
+
+                                <InfoBar IsOpen="{Binding HasError}" Severity="Error" Title="Job failed" Message="{Binding Error}"
+                                         IsClosable="False" />
+
+                                <Expander Header="Items" IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <ListView ItemsSource="{Binding Children}" SelectionMode="None" MaxHeight="300" Padding="0"
+                                              ScrollViewer.HorizontalScrollMode="Disabled"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Margin" Value="0,0,0,4" />
+                                                <Setter Property="IsTabStop" Value="False" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid ColumnSpacing="10" Padding="6,7" HorizontalAlignment="Stretch"
+                                                      BorderBrush="{ThemeResource DividerBrush}" BorderThickness="0,0,0,1">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="110" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <FontIcon Glyph="&#xE8A5;" FontSize="13" VerticalAlignment="Top" Margin="0,2,0,0" />
+                                                    <StackPanel Grid.Column="1" Spacing="2">
+                                                        <TextBlock Text="{Binding FileName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" FontSize="11" TextWrapping="Wrap"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                        <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{ThemeResource DangerBrush}"
+                                                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="3" />
+                                                        <TextBlock Text="{Binding ProgressText}" FontSize="10" HorizontalAlignment="Right"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CancelItemCommand}"
+                                                                Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTipService.ToolTip="Cancel this item" AutomationProperties.Name="Cancel this item">
+                                                            <FontIcon Glyph="&#xE769;" FontSize="12" />
+                                                        </Button>
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveItemCommand}"
+                                                                Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTipService.ToolTip="Remove this item without deleting its output"
+                                                                AutomationProperties.Name="Remove this item from queue">
+                                                            <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                                        </Button>
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
+                                                                Visibility="{Binding CanOpenOutput, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTipService.ToolTip="Open output" AutomationProperties.Name="Open job output">
+                                                            <FontIcon Glyph="&#xE8E5;" FontSize="12" />
+                                                        </Button>
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CompareCommand}"
+                                                                Visibility="{Binding CanCompare, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTipService.ToolTip="Compare before and after" AutomationProperties.Name="Compare before and after">
+                                                            <FontIcon Glyph="&#xE8AB;" FontSize="12" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+    </Grid>
+</Page>

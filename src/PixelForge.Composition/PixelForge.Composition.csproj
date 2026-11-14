@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PixelForge.Composition</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PixelForge.Domain\PixelForge.Domain.csproj" />
+    <ProjectReference Include="..\PixelForge.Application\PixelForge.Application.csproj" />
+    <ProjectReference Include="..\PixelForge.Infrastructure\PixelForge.Infrastructure.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Images\PixelForge.Engines.Images.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.FFmpeg\PixelForge.Engines.FFmpeg.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Upscaling\PixelForge.Engines.Upscaling.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Documents\PixelForge.Engines.Documents.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Archives\PixelForge.Engines.Archives.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.ImageTools\PixelForge.Engines.ImageTools.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.FFmpegTools\PixelForge.Engines.FFmpegTools.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.OCR\PixelForge.Engines.OCR.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+</Project>

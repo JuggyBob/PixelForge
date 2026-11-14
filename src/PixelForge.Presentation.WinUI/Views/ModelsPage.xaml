@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.ModelsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    Background="Transparent">
+
+    <controls:ModelManagerView x:Name="ManagerView" />
+</Page>

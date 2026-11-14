@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new capability or improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you want to solve. If the feature depends on a new engine, runtime, or model, include its source, license, and redistribution terms.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What is difficult or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should PixelForge do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: input
+    id: dependencies
+    attributes:
+      label: New dependencies or models
+      description: Include source, license, approximate size, and redistribution terms, or write "None".
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched for an existing request.
+          required: true
+        - label: I did not include private media, paths, or credentials.
+          required: true

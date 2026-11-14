@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.UpscalerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    NavigationCacheMode="Required"
+    AllowDrop="True"
+    DragOver="OnDragOver"
+    Drop="OnDrop"
+    Background="Transparent">
+
+    <Grid Padding="28,22,28,24" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="Image Upscaler" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="UpscalerTitle" />
+                <TextBlock Text="Reconstruct detail with AI or resample with precision — with full-resolution before/after comparison."
+                           Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Border Style="{StaticResource StatusPillStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="7" Height="7" Fill="{ThemeResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ProviderStatus}" FontSize="11" MaxWidth="360" TextTrimming="CharacterEllipsis"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="380" />
+                <ColumnDefinition Width="420" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Files and scan -->
+            <Border Grid.Column="0" Style="{StaticResource SectionCardStyle}" Padding="16">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <controls:ResponsiveHeaderPanel ColumnSpacing="10" RowSpacing="6">
+                        <Grid ColumnSpacing="10" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Images" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Style="{StaticResource FormatBadgeStyle}">
+                                <TextBlock Text="{Binding Files.Count}" FontSize="11" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Content="Add images" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding BrowseImagesCommand}" AutomationProperties.AutomationId="UpscalerAddImages" />
+                            <Button Content="Add folder" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding BrowseFolderCommand}" AutomationProperties.AutomationId="UpscalerAddFolder" />
+                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ClearFilesCommand}"
+                                    ToolTipService.ToolTip="Clear workspace" AutomationProperties.Name="Clear workspace" AutomationProperties.AutomationId="UpscalerClear">
+                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </controls:ResponsiveHeaderPanel>
+
+                    <Grid Grid.Row="1" ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
+                                  IsChecked="{Binding IncludeSubfolders, Mode=TwoWay}"
+                                  AutomationProperties.Name="Include subfolders" />
+                        <CheckBox Grid.Column="1" Content="Preserve folder structure" MinHeight="0" VerticalAlignment="Center"
+                                  IsChecked="{Binding PreserveFolderStructure, Mode=TwoWay}" />
+                        <ProgressRing Grid.Column="2" IsActive="{Binding IsScanning}" Width="16" Height="16"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                                      Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+
+                    <StackPanel Grid.Row="2" Spacing="6">
+                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" Title="Import summary"
+                                 Message="{Binding ScanSummary}" IsClosable="False" />
+                        <Expander Header="Skipped files" IsExpanded="False"
+                                  Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVisibility}}"
+                                  HorizontalAlignment="Stretch">
+                            <ItemsControl ItemsSource="{Binding Skipped}" MaxHeight="150">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="8" Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource WarningBrush}" />
+                                            <StackPanel Grid.Column="1" Spacing="0">
+                                                <TextBlock Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Reason}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </StackPanel>
+
+                    <Grid Grid.Row="3">
+                        <Border Background="{ThemeResource DropZoneBackgroundBrush}" BorderBrush="{ThemeResource DropZoneBorderBrush}"
+                                BorderThickness="1" CornerRadius="9"
+                                Visibility="{Binding HasFiles, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="420">
+                                <Border Background="{ThemeResource AccentSubtleBrush}" Width="62" Height="62" CornerRadius="16" HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE71E;" FontSize="28" Foreground="{ThemeResource AccentTextBrush}" />
+                                </Border>
+                                <TextBlock Text="Drop images or a folder" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                <TextBlock Text="Folder scans validate image contents, ignore unrelated files and can preserve subfolders."
+                                           Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <Button Content="Choose images" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding BrowseImagesCommand}" />
+                                    <Button Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding BrowseFolderCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="Animated, multi-page and vector images are reported instead of being silently altered."
+                                           Style="{StaticResource CaptionTextStyle}" TextAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <ListView ItemsSource="{Binding Files}" SelectionMode="None"
+                                  Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListView.ItemContainerTransitions>
+                                <TransitionCollection>
+                                    <AddDeleteThemeTransition />
+                                    <RepositionThemeTransition />
+                                </TransitionCollection>
+                            </ListView.ItemContainerTransitions>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="12" Padding="4,7" BorderBrush="{ThemeResource DividerBrush}" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="48" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="48" Height="48" CornerRadius="7" Background="{ThemeResource SubtleSurfaceBrush}" VerticalAlignment="Center">
+                                            <Grid>
+                                                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                                                       Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibility}}" />
+                                                <FontIcon Glyph="{Binding IconGlyph}" FontSize="18"
+                                                          Visibility="{Binding HasThumbnail, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayPath}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Style="{StaticResource FormatBadgeStyle}">
+                                            <TextBlock Text="{Binding Dimensions}" FontSize="10" />
+                                        </Border>
+                                        <Button Grid.Column="3" Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveCommand}"
+                                                ToolTipService.ToolTip="Remove from list" AutomationProperties.Name="Remove from list">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Upscaling settings -->
+            <Border Grid.Column="1" Style="{StaticResource SectionCardStyle}" Padding="0">
+                <Grid RowSpacing="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Padding="18,16,18,10" Spacing="2">
+                        <TextBlock Text="Enhancement settings" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Text="Traditional interpolation or learned AI reconstruction."
+                                   Style="{StaticResource CaptionTextStyle}" />
+                    </StackPanel>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,4,18,18">
+                        <StackPanel Spacing="15">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <RadioButton GroupName="UpscaleMethod" Style="{StaticResource SegmentRadioButtonStyle}"
+                                             IsChecked="{Binding IsTraditional, Mode=OneWay}" Checked="OnMethodChecked" Tag="Traditional"
+                                             AutomationProperties.AutomationId="UpscaleTraditional">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <FontIcon Glyph="&#xE8A9;" FontSize="13" />
+                                        <TextBlock Text="Traditional" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton GroupName="UpscaleMethod" Style="{StaticResource SegmentRadioButtonStyle}"
+                                             IsChecked="{Binding IsAi, Mode=OneWay}" Checked="OnMethodChecked" Tag="AI"
+                                             AutomationProperties.AutomationId="UpscaleAI">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <FontIcon Glyph="&#xE945;" FontSize="13" />
+                                        <TextBlock Text="AI reconstruction" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6" Visibility="{Binding ShowAlgorithm, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Resampling algorithm" Style="{StaticResource CaptionTextStyle}" />
+                                <ComboBox ItemsSource="{Binding Algorithms}" SelectedItem="{Binding SelectedAlgorithm, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" />
+                                <TextBlock Text="Nearest preserves pixel art; Lanczos is the best general default; Mitchell is softer."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="12" Visibility="{Binding ShowAi, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="AI model" Style="{StaticResource CaptionTextStyle}" />
+                                    <Grid ColumnSpacing="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
+                                                  DisplayMemberPath="Name" HorizontalAlignment="Stretch"
+                                                  AutomationProperties.Name="AI model"
+                                                  AutomationProperties.AutomationId="UpscalerModelPicker" />
+                                        <Button Grid.Column="1" Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
+                                                Command="{Binding ManageModelsCommand}" AutomationProperties.AutomationId="UpscalerManageModels" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding ModelStatus}" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding SelectedModelDetail}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Spacing="4" Visibility="{Binding ShowNoiseLevel, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Denoise level" Style="{StaticResource CaptionTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding NoiseLevels}" SelectedItem="{Binding SelectedNoiseLevel, Mode=TwoWay}"
+                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch"
+                                              AutomationProperties.AutomationId="UpscalerNoiseLevel" />
+                                    <TextBlock Text="{Binding NoiseLevelHint}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayName" HorizontalAlignment="Stretch"
+                                              AutomationProperties.Name="Execution provider"
+                                              AutomationProperties.AutomationId="UpscalerProviderPicker" />
+                                    <TextBlock Text="{Binding ProviderStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleSwitch Header="Automatic tile size" IsOn="{Binding AutoTileSize, Mode=TwoWay}" />
+                                <Grid ColumnSpacing="8" Visibility="{Binding AutoTileSize, Converter={StaticResource InverseBoolToVisibility}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <NumberBox Header="Tile size" Minimum="64" Maximum="2048" SmallChange="32"
+                                               SpinButtonPlacementMode="Compact" Value="{Binding TileSize, Mode=TwoWay}" />
+                                    <NumberBox Grid.Column="1" Header="Overlap" Minimum="0" Maximum="512" SmallChange="8"
+                                               SpinButtonPlacementMode="Compact" Value="{Binding TileOverlap, Mode=TwoWay}" />
+                                </Grid>
+                                <TextBlock Text="Tiles keep GPU memory bounded. Automatic is recommended; reduce tile size if DirectML reports an allocation failure."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Scale" Style="{StaticResource CaptionTextStyle}" />
+                                <ComboBox ItemsSource="{Binding ScaleOptions}" SelectedItem="{Binding SelectedScale, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" HorizontalAlignment="Stretch"
+                                          AutomationProperties.Name="Scale"
+                                          AutomationProperties.AutomationId="UpscalerScalePicker" />
+                                <TextBlock Text="{Binding ScaleHint}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Grid ColumnSpacing="8" Visibility="{Binding ShowCustomSize, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <NumberBox Header="Width" Minimum="1" Maximum="32768" SpinButtonPlacementMode="Compact"
+                                           Value="{Binding CustomWidth, Mode=TwoWay}" />
+                                <NumberBox Grid.Column="1" Header="Height" Minimum="1" Maximum="32768" SpinButtonPlacementMode="Compact"
+                                           Value="{Binding CustomHeight, Mode=TwoWay}" />
+                            </Grid>
+                            <ToggleSwitch Header="Preserve aspect ratio" IsOn="{Binding PreserveAspect, Mode=TwoWay}" />
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Output format" Style="{StaticResource CaptionTextStyle}" />
+                                <ComboBox ItemsSource="{Binding OutputFormats}" SelectedItem="{Binding SelectedOutputFormat, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" />
+                                <TextBlock Text="Same as source keeps the original format when the engine can write it; otherwise PNG is used."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="6" Visibility="{Binding ShowOutputQuality, Converter={StaticResource BoolToVisibility}}">
+                                <Grid>
+                                    <TextBlock Text="Output quality" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding OutputQuality}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+                                </Grid>
+                                <Slider Minimum="1" Maximum="100" StepFrequency="1" Value="{Binding OutputQuality, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Destination" Style="{StaticResource CaptionTextStyle}" />
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
+                                        <TextBlock Text="{Binding OutputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding OutputDirectory}" />
+                                    </Border>
+                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding ChooseOutputCommand}" AutomationProperties.AutomationId="UpscalerChooseOutput" />
+                                    <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
+                                            ToolTipService.ToolTip="Open destination" AutomationProperties.Name="Open destination">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="13" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="If a file exists" Style="{StaticResource CaptionTextStyle}" />
+                                    <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedCollision, Mode=TwoWay}"
+                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Filename suffix" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBox Text="{Binding FileNameSuffix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="auto, e.g. _4x" />
+                                </StackPanel>
+                            </Grid>
+                            <ToggleSwitch Header="Preserve metadata" IsOn="{Binding PreserveMetadata, Mode=TwoWay}" />
+                            <ToggleSwitch Header="Preserve alpha channel" IsOn="{Binding PreserveAlpha, Mode=TwoWay}" />
+                            <ToggleSwitch Header="Preserve ICC colour profile" IsOn="{Binding PreserveIccProfile, Mode=TwoWay}" />
+
+                            <StackPanel Spacing="8" Visibility="{Binding HasValidationErrors, Converter={StaticResource BoolToVisibility}}">
+                                <InfoBar IsOpen="True" Severity="Error" Title="Cannot start" Message="{Binding ValidationSummary}" />
+                            </StackPanel>
+                            <StackPanel Spacing="8" Visibility="{Binding HasValidationWarnings, Converter={StaticResource BoolToVisibility}}">
+                                <InfoBar IsOpen="True" Severity="Warning" Title="Review before processing" Message="{Binding ValidationSummary}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource SectionCardStyle}" Padding="16,12">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Summary}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding OutputDirectory}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Compare last result" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CompareLastCommand}"
+                            IsEnabled="{Binding CanCompare}" AutomationProperties.AutomationId="UpscalerCompare" />
+                    <Button Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding AddToQueueCommand}"
+                            IsEnabled="{Binding CanQueue}" AutomationProperties.AutomationId="UpscalerAddToQueue" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.WatchFoldersPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    Background="Transparent">
+
+    <Grid Padding="28,22,28,24" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <StackPanel Spacing="3">
+                <TextBlock Text="Watch Folders" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="WatchTitle" />
+                <TextBlock Text="Automatically queue new files from a folder. Source files are never deleted or modified in place."
+                           Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+            <ProgressRing IsActive="{Binding IsBusy}" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center" />
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420" />
+                <ColumnDefinition Width="*" MinWidth="360" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SectionCardStyle}" Padding="18">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="New watch rule" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBox Header="Rule name" Text="{Binding RuleName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="e.g. Incoming screenshots" />
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Input folder" Style="{StaticResource CaptionTextStyle}" />
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
+                                    <Grid>
+                                        <TextBlock Text="{Binding InputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding InputDirectory}"
+                                                   Visibility="{Binding HasInputFolder, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="Choose a folder to watch" FontSize="11"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   Visibility="{Binding HasInputFolder, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    </Grid>
+                                </Border>
+                                <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding BrowseInputCommand}" />
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Output folder" Style="{StaticResource CaptionTextStyle}" />
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
+                                    <TextBlock Text="{Binding OutputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                               ToolTipService.ToolTip="{Binding OutputDirectory}" />
+                                </Border>
+                                <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding BrowseOutputCommand}" />
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Category" Style="{StaticResource CaptionTextStyle}" />
+                            <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                      DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Output format" Style="{StaticResource CaptionTextStyle}" />
+                            <controls:FormatPicker ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat, Mode=TwoWay}"
+                                                   AutomationId="WatchFormatPicker" />
+                        </StackPanel>
+                        <StackPanel Spacing="6" Visibility="{Binding IsImageCategory, Converter={StaticResource BoolToVisibility}}">
+                            <Grid>
+                                <TextBlock Text="Image quality" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock Text="{Binding ImageQuality}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+                            </Grid>
+                            <Slider Minimum="1" Maximum="100" StepFrequency="1" Value="{Binding ImageQuality, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4" Visibility="{Binding IsAudioCategory, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Audio bitrate" Style="{StaticResource CaptionTextStyle}" />
+                            <ComboBox ItemsSource="{Binding AudioBitrates}" SelectedItem="{Binding SelectedAudioBitrate, Mode=TwoWay}"
+                                      DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                        <ToggleSwitch Header="Include subfolders" IsOn="{Binding IncludeSubdirectories, Mode=TwoWay}" />
+                        <ToggleSwitch Header="Enable immediately" IsOn="{Binding EnableImmediately, Mode=TwoWay}" />
+                        <Button Content="Create watch rule" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch"
+                                Command="{Binding AddRuleCommand}"
+                                AutomationProperties.AutomationId="WatchAddRule" />
+                        <InfoBar IsOpen="{Binding HasError}" Severity="Warning" Title="Watch rule needs attention"
+                                 Message="{Binding StatusMessage}" IsClosable="False" />
+                        <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap"
+                                   Visibility="{Binding HasError, Converter={StaticResource InverseBoolToVisibility}}" />
+                        <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="7" Padding="10,8">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="How it works" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock Text="Files are inspected first, held until their size is stable, then queued through the central processing queue. Output files are ignored to prevent loops. Failed files are recorded and are not retried automatically."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource SectionCardStyle}" Padding="18">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid ColumnSpacing="10" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Configured rules" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Style="{StaticResource FormatBadgeStyle}">
+                                <TextBlock Text="{Binding RunSummary}" FontSize="11" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8"
+                                    Visibility="{Binding HasRules, Converter={StaticResource InverseBoolToVisibility}}">
+                            <FontIcon Glyph="&#xE8F1;" FontSize="26" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="No watch folders yet" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="Create a rule on the left to start automating a folder."
+                                       Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
+                        </StackPanel>
+
+                        <ListView ItemsSource="{Binding Rules}" SelectionMode="None"
+                                  Visibility="{Binding HasRules, Converter={StaticResource BoolToVisibility}}">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="12" Padding="4,10" BorderBrush="{ThemeResource DividerBrush}" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" />
+                                                <Border Style="{StaticResource FormatBadgeStyle}">
+                                                    <TextBlock Text="{Binding OperationLabel}" FontSize="10" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding InputDirectory}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding OutputDirectory}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding ErrorText}" FontSize="11" Foreground="{ThemeResource DangerBrush}"
+                                                       TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                                            <ToggleSwitch IsOn="{Binding IsEnabled, Mode=TwoWay}" OnContent="" OffContent=""
+                                                          ToolTipService.ToolTip="Enable or pause this rule"
+                                                          AutomationProperties.Name="Enable watch rule" />
+                                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenInputCommand}"
+                                                    ToolTipService.ToolTip="Open input folder" AutomationProperties.Name="Open input folder">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="13" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
+                                                    ToolTipService.ToolTip="Open output folder" AutomationProperties.Name="Open output folder">
+                                                <FontIcon Glyph="&#xE838;" FontSize="13" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding DeleteCommand}"
+                                                    ToolTipService.ToolTip="Remove rule" AutomationProperties.Name="Remove watch rule">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="13" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

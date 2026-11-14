@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/JuggyBob/PixelForge/security/advisories/new
+    about: Report vulnerabilities privately. Do not include exploit details in a public issue.
+  - name: Documentation and build guide
+    url: https://github.com/JuggyBob/PixelForge/blob/main/docs/BUILDING.md
+    about: Build, test, and packaging instructions.

@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.OcrPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    NavigationCacheMode="Required"
+    AllowDrop="True"
+    DragOver="OnDragOver"
+    Drop="OnDrop"
+    KeyboardAcceleratorPlacementMode="Hidden"
+    Background="Transparent">
+
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Key="V" Modifiers="Control" Invoked="OnPasteAccelerator" />
+    </Page.KeyboardAccelerators>
+
+    <Grid Padding="28,22,28,24" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="3">
+                <TextBlock Text="OCR Documents" Style="{StaticResource PageTitleTextStyle}"
+                           AutomationProperties.AutomationId="OcrTitle" />
+                <TextBlock Text="Turn scanned pages, photos and screenshots into one ordered, searchable document - fully offline."
+                           Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Border Style="{StaticResource StatusPillStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="7" Height="7" Fill="{ThemeResource AccentPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ModelBadge}" FontSize="11"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="380" />
+                <ColumnDefinition Width="440" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Page workspace -->
+            <Border Grid.Column="0" Style="{StaticResource SectionCardStyle}" Padding="16">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <controls:ResponsiveHeaderPanel ColumnSpacing="10" RowSpacing="6">
+                        <Grid ColumnSpacing="10" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Document pages" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Style="{StaticResource FormatBadgeStyle}">
+                                <TextBlock Text="{Binding PageCount}" FontSize="11" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Content="Add images" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding AddImagesCommand}" AutomationProperties.AutomationId="OcrAddImages" />
+                            <Button Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding PasteImagesCommand}"
+                                    ToolTipService.ToolTip="Paste pages from the clipboard"
+                                    AutomationProperties.AutomationId="OcrPaste" />
+                            <Button Content="Scan folder" Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding ScanFolderCommand}" AutomationProperties.AutomationId="OcrScanFolder" />
+                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ClearPagesCommand}"
+                                    ToolTipService.ToolTip="Clear pages" AutomationProperties.Name="Clear OCR pages"
+                                    AutomationProperties.AutomationId="OcrClear">
+                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </controls:ResponsiveHeaderPanel>
+
+                    <StackPanel Grid.Row="1" Spacing="6">
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
+                                      IsChecked="{Binding ScanRecursive, Mode=TwoWay}"
+                                      AutomationProperties.Name="Include subfolders in OCR folder scans" />
+                            <ProgressRing Grid.Column="1" IsActive="{Binding IsScanning}" Width="16" Height="16"
+                                          HorizontalAlignment="Right" VerticalAlignment="Center"
+                                          Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" Title="Page import"
+                                 Message="{Binding ScanSummary}" IsClosable="False" />
+                        <Expander Header="Files ignored by this import" IsExpanded="False"
+                                  Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVisibility}}"
+                                  HorizontalAlignment="Stretch">
+                            <ItemsControl ItemsSource="{Binding Skipped}" MaxHeight="140">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="8" Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource WarningBrush}" />
+                                            <StackPanel Grid.Column="1" Spacing="0">
+                                                <TextBlock Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Reason}" FontSize="10"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <Border Background="{ThemeResource DropZoneBackgroundBrush}" BorderBrush="{ThemeResource DropZoneBorderBrush}"
+                                BorderThickness="1" CornerRadius="9"
+                                Visibility="{Binding HasPages, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="440">
+                                <Border Background="{ThemeResource AccentSubtleBrush}" Width="62" Height="62" CornerRadius="16"
+                                        HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8A5;" FontSize="28" Foreground="{ThemeResource AccentTextBrush}" />
+                                </Border>
+                                <TextBlock Text="Drop scanned pages here" FontSize="17" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Add one or more images, or scan a folder. Pages keep the order shown here and are combined into a single DOCX."
+                                           Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
+                                <Grid ColumnSpacing="8" MaxWidth="440" HorizontalAlignment="Stretch">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="Choose images" Style="{StaticResource PrimaryButtonStyle}"
+                                            Command="{Binding AddImagesCommand}" HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding PasteImagesCommand}" HorizontalAlignment="Stretch"
+                                            ToolTipService.ToolTip="Paste pages from the clipboard"
+                                            AutomationProperties.Name="Paste OCR pages"
+                                            AutomationProperties.HelpText="Paste a clipboard image or image files copied from File Explorer (Ctrl+V)." />
+                                    <Button Grid.Column="2" Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding ScanFolderCommand}" HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <ListView ItemsSource="{Binding Pages}" SelectionMode="None"
+                                  Visibility="{Binding HasPages, Converter={StaticResource BoolToVisibility}}"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  AutomationProperties.AutomationId="OcrPageList">
+                            <ListView.ItemContainerTransitions>
+                                <TransitionCollection>
+                                    <AddDeleteThemeTransition />
+                                    <RepositionThemeTransition />
+                                </TransitionCollection>
+                            </ListView.ItemContainerTransitions>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="12" Padding="4,7"
+                                          BorderBrush="{ThemeResource DividerBrush}" BorderThickness="0,0,0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="52" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Width="30" Height="30" CornerRadius="15"
+                                                Background="{ThemeResource AccentSubtleBrush}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding PageNumber}" FontSize="12" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource AccentTextBrush}" />
+                                        </Border>
+
+                                        <Border Grid.Column="1" Width="52" Height="52" CornerRadius="7"
+                                                Background="{ThemeResource SubtleSurfaceBrush}" VerticalAlignment="Center">
+                                            <Grid>
+                                                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                                                       Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibility}}" />
+                                                <FontIcon Glyph="&#xE8A5;" FontSize="18"
+                                                          Visibility="{Binding HasThumbnail, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding FileName}" FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTipService.ToolTip="{Binding FilePath}" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="11"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding MoveUpCommand}"
+                                                    IsEnabled="{Binding CanMoveUp}"
+                                                    ToolTipService.ToolTip="Move page up"
+                                                    AutomationProperties.Name="Move page up">
+                                                <FontIcon Glyph="&#xE74A;" FontSize="12" />
+                                            </Button>
+                                            <Button Style="{StaticResource IconButtonStyle}" Command="{Binding MoveDownCommand}"
+                                                    IsEnabled="{Binding CanMoveDown}"
+                                                    ToolTipService.ToolTip="Move page down"
+                                                    AutomationProperties.Name="Move page down">
+                                                <FontIcon Glyph="&#xE74B;" FontSize="12" />
+                                            </Button>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="4" Style="{StaticResource IconButtonStyle}"
+                                                Command="{Binding RemoveCommand}"
+                                                ToolTipService.ToolTip="Remove page"
+                                                AutomationProperties.Name="Remove page from document">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- OCR options -->
+            <Border Grid.Column="1" Style="{StaticResource SectionCardStyle}" Padding="0">
+                <Grid RowSpacing="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Padding="18,16,18,10" Spacing="2">
+                        <TextBlock Text="Document settings" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Text="One PDF-quality DOCX is produced per job; ordering follows this page list."
+                                   Style="{StaticResource CaptionTextStyle}" />
+                    </StackPanel>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,4,18,18">
+                        <StackPanel Spacing="15">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Document name" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBox Text="{Binding DocumentName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         PlaceholderText="ScannedDocument_OCR"
+                                         AutomationProperties.AutomationId="OcrDocumentName" />
+                                <TextBlock Text="The DOCX and optional PDF use this name. A unique number is added when a file already exists."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Recognition model" Style="{StaticResource CaptionTextStyle}" />
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
+                                              DisplayMemberPath="Name" HorizontalAlignment="Stretch"
+                                              AutomationProperties.AutomationId="OcrModelPicker" />
+                                    <Button Grid.Column="1" Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding ManageModelsCommand}"
+                                            AutomationProperties.AutomationId="OcrManageModels" />
+                                </Grid>
+                                <TextBlock Text="{Binding ModelStatus}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ProviderStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedModel.IntendedUse}" Style="{StaticResource CaptionTextStyle}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedModel.Notes}" Style="{StaticResource CaptionTextStyle}"
+                                           TextWrapping="Wrap" />
+
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="Download model" Style="{StaticResource SecondaryButtonStyle}"
+                                            HorizontalAlignment="Stretch" Command="{Binding DownloadModelCommand}"
+                                            Visibility="{Binding SelectedModel.CanDownload, Converter={StaticResource BoolToVisibility}}"
+                                            AutomationProperties.AutomationId="OcrDownloadModel" />
+                                    <Button Grid.Column="1" Content="Cancel" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding CancelModelDownloadCommand}"
+                                            Visibility="{Binding SelectedModel.IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Grid.Column="2" Content="Remove" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding RemoveModelCommand}"
+                                            Visibility="{Binding SelectedModel.CanRemove, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+
+                                <StackPanel Spacing="3"
+                                            Visibility="{Binding SelectedModel.IsDownloading, Converter={StaticResource BoolToVisibility}}">
+                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding SelectedModel.Progress}" Height="4" />
+                                    <TextBlock Text="{Binding SelectedModel.ProgressText}" Style="{StaticResource CaptionTextStyle}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <InfoBar IsOpen="{Binding SelectedModel.HasError}" Severity="Error" Title="Model download failed"
+                                         Message="{Binding SelectedModel.Error}" IsClosable="False" />
+                                <InfoBar IsOpen="{Binding SelectedModel.NeedsDownload}" Severity="Warning"
+                                         Title="Model download required"
+                                         Message="Download the selected model once. It is stored locally and verified with SHA-256 before use."
+                                         IsClosable="False" />
+                                <TextBlock Text="{Binding ModelLanguageText}" Style="{StaticResource CaptionTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+
+                            <StackPanel Spacing="8">
+                                <ToggleSwitch Header="Generate PDF companion"
+                                              IsOn="{Binding GeneratePdf, Mode=TwoWay}"
+                                              AutomationProperties.AutomationId="OcrGeneratePdf" />
+                                <TextBlock Text="The PDF is generated from the same DOCX content, so page order and text match."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <ToggleSwitch Header="Preprocess page images"
+                                              IsOn="{Binding Preprocess, Mode=TwoWay}"
+                                              AutomationProperties.AutomationId="OcrPreprocess" />
+                                <TextBlock Text="Normalizes page polarity and contrast before detection. Turn this off for already clean scans."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Page order" Style="{StaticResource CaptionTextStyle}" />
+                                <ComboBox ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSort, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" HorizontalAlignment="Stretch"
+                                          AutomationProperties.AutomationId="OcrSortMode" />
+                                <TextBlock Text="Applied to the current page list and to newly scanned folders. Use the arrow buttons to adjust pages by hand."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource DividerBrush}" />
+
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Destination" Style="{StaticResource CaptionTextStyle}" />
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
+                                        <TextBlock Text="{Binding OutputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding OutputDirectory}" />
+                                    </Border>
+                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                            Command="{Binding ChooseOutputCommand}"
+                                            AutomationProperties.AutomationId="OcrChooseOutput" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="If a document already exists" Style="{StaticResource CaptionTextStyle}" />
+                                <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedCollision, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="8"
+                                        Visibility="{Binding HasValidationErrors, Converter={StaticResource BoolToVisibility}}">
+                                <InfoBar IsOpen="True" Severity="Error" Title="Cannot start"
+                                         Message="{Binding ValidationSummary}" />
+                            </StackPanel>
+                            <StackPanel Spacing="8"
+                                        Visibility="{Binding HasValidationWarnings, Converter={StaticResource BoolToVisibility}}">
+                                <InfoBar IsOpen="True" Severity="Warning" Title="Review before processing"
+                                         Message="{Binding ValidationSummary}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource SectionCardStyle}" Padding="16,12">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding FooterStatus}" FontSize="13" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding OutputDirectory}" Style="{StaticResource CaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Open DOCX" Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenDocxCommand}" IsEnabled="{Binding HasOutput}"
+                            AutomationProperties.AutomationId="OcrOpenDocx" />
+                    <Button Content="Open PDF" Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenPdfCommand}" IsEnabled="{Binding HasOutput}"
+                            Visibility="{Binding GeneratePdf, Converter={StaticResource BoolToVisibility}}"
+                            AutomationProperties.AutomationId="OcrOpenPdf" />
+                    <Button Content="Open folder" Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenOutputFolderCommand}"
+                            AutomationProperties.AutomationId="OcrOpenFolder" />
+                    <Button Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}"
+                            Command="{Binding AddToQueueCommand}" IsEnabled="{Binding CanQueue}"
+                            AutomationProperties.AutomationId="OcrAddToQueue" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

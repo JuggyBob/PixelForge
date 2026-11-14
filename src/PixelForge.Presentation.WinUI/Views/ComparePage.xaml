@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.ComparePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    Background="Transparent">
+
+    <Grid Padding="28,22,28,24" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button Style="{StaticResource IconButtonStyle}" Click="OnBackClick" VerticalAlignment="Top" Margin="0,2,10,0"
+                    AutomationProperties.Name="Back">
+                <FontIcon Glyph="&#xE72B;" FontSize="14" />
+            </Button>
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock x:Name="TitleText" Text="Before / after" Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock x:Name="SubtitleText" Text="Inspect the original and the verified output at full resolution."
+                           Style="{StaticResource PageSubtitleTextStyle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Button Content="Fit" Style="{StaticResource SecondaryButtonStyle}" Click="OnFitClick" ToolTipService.ToolTip="Fit to window" />
+                <Button Content="100%" Style="{StaticResource SecondaryButtonStyle}" Click="OnActualSizeClick" ToolTipService.ToolTip="Full-resolution inspection" />
+                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomOutClick" ToolTipService.ToolTip="Zoom out"
+                        AutomationProperties.Name="Zoom out">
+                    <FontIcon Glyph="&#xE71F;" FontSize="14" />
+                </Button>
+                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomInClick" ToolTipService.ToolTip="Zoom in"
+                        AutomationProperties.Name="Zoom in">
+                    <FontIcon Glyph="&#xE710;" FontSize="14" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource SectionCardStyle}" Padding="10">
+            <controls:BeforeAfterView x:Name="Comparator" />
+        </Border>
+
+        <Grid Grid.Row="2" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Original" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="OriginalNameText" Text="—" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="OriginalMetaText" Text="—" Style="{StaticResource CaptionTextStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Upscaled output" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="OutputNameText" Text="—" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="OutputMetaText" Text="—" Style="{StaticResource CaptionTextStyle}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource InsetCardStyle}" Padding="14,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Inspection" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="ScaleText" Text="—" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock Text="Drag the divider · wheel to zoom · drag the image to pan"
+                               Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

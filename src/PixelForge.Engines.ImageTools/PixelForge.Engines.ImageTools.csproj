@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PixelForge.Engines.ImageTools</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PixelForge.Domain\PixelForge.Domain.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Images\PixelForge.Engines.Images.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Magick.NET-Q16-x64" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+</Project>

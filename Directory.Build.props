@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <Version>1.0.0</Version>
+    <Authors>PixelForge</Authors>
+    <Company>PixelForge</Company>
+    <Product>PixelForge</Product>
+    <Copyright>Copyright (c) 2026 PixelForge</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <NoWarn>$(NoWarn);CA1416;MVVMTK0045;CA1305</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+</Project>

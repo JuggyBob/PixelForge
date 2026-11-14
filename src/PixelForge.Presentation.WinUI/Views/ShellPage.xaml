@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="PixelForge.Presentation.Views.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    xmlns:pf="using:PixelForge.Presentation.Controls"
+    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
+    xmlns:animation="using:Microsoft.UI.Xaml.Media.Animation"
+    Background="Transparent">
+
+    <Grid x:Name="ShellRoot" Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar -->
+        <Grid Grid.Row="0">
+            <Grid x:Name="TitleBarDragArea" Background="Transparent" Margin="0,0,210,0" Padding="18,0,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Image Source="ms-appx:///Assets/Logo.png" Width="24" Height="24" />
+                    <TextBlock Text="PixelForge" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+
+            <Button x:Name="NotificationCenterButton" Style="{StaticResource IconButtonStyle}"
+                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,158,0"
+                    Background="{ThemeResource SubtleSurfaceBrush}"
+                    BorderBrush="{ThemeResource DividerBrush}" BorderThickness="1"
+                    ToolTipService.ToolTip="Recent notifications"
+                    AutomationProperties.Name="Recent notifications"
+                    AutomationProperties.AutomationId="NotificationCenterButton">
+                <Grid Width="24" Height="20" IsHitTestVisible="False">
+                    <FontIcon Glyph="&#xEA8F;" FontSize="15" />
+                    <InfoBadge x:Name="NotificationBadge" Value="0" Visibility="Collapsed"
+                               IsHitTestVisible="False"
+                               HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-6,-2,0" />
+                </Grid>
+                <Button.Flyout>
+                    <Flyout x:Name="NotificationCenterFlyout" Placement="Bottom"
+                            Opened="OnNotificationFlyoutOpened">
+                        <Grid Width="390" RowSpacing="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Spacing="1">
+                                    <TextBlock Text="Notifications" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="Recent app activity and job results."
+                                               Style="{StaticResource CaptionTextStyle}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Clear" Style="{StaticResource SubtleButtonStyle}"
+                                        Click="OnClearNotificationsClick"
+                                        AutomationProperties.AutomationId="NotificationClear" />
+                            </Grid>
+
+                            <StackPanel x:Name="ActiveNotificationsSection" Grid.Row="1" Spacing="4"
+                                        Visibility="Collapsed">
+                                <TextBlock Text="In progress" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <ItemsControl x:Name="ActiveNotificationList"
+                                              AutomationProperties.AutomationId="ActiveNotificationList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="8"
+                                                    Padding="10,8" Margin="0,0,4,5">
+                                                <Grid ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="28" Height="28" CornerRadius="8"
+                                                            Background="{ThemeResource AccentSubtleBrush}"
+                                                            VerticalAlignment="Top">
+                                                        <FontIcon Glyph="{Binding Glyph}" FontSize="13"
+                                                                  Foreground="{ThemeResource AccentTextBrush}" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="3">
+                                                        <Grid ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Title}" FontSize="12"
+                                                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="10"
+                                                                       Foreground="{ThemeResource AccentTextBrush}" />
+                                                        </Grid>
+                                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}"
+                                                                     Height="4" />
+                                                        <Grid>
+                                                            <TextBlock Text="{Binding ProgressText}" FontSize="10"
+                                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                            <TextBlock Text="{Binding Detail}" FontSize="10"
+                                                                       HorizontalAlignment="Right"
+                                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <ListView x:Name="NotificationHistoryList" SelectionMode="None" MaxHeight="360"
+                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                          AutomationProperties.AutomationId="NotificationHistoryList">
+                                    <ListView.ItemContainerTransitions>
+                                        <TransitionCollection>
+                                            <AddDeleteThemeTransition />
+                                        </TransitionCollection>
+                                    </ListView.ItemContainerTransitions>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="10" Padding="2,8" Margin="0,0,4,0"
+                                                  BorderBrush="{ThemeResource DividerBrush}" BorderThickness="0,0,0,1"
+                                                  AutomationProperties.AutomationId="NotificationHistoryItem"
+                                                  AutomationProperties.Name="{Binding AccessibleName}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="28" Height="28" CornerRadius="8"
+                                                        Background="{ThemeResource SubtleSurfaceBrush}"
+                                                        VerticalAlignment="Top">
+                                                    <FontIcon Glyph="{Binding Glyph}" FontSize="13"
+                                                              Foreground="{Binding AccentBrush}" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <Grid ColumnSpacing="8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Title}" FontSize="12"
+                                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding TimeText}" FontSize="10"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Message}" FontSize="11"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               TextWrapping="Wrap" MaxLines="3"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <Button Grid.Column="2" Style="{StaticResource SubtleButtonStyle}"
+                                                        Width="28" Height="28" MinWidth="28" MinHeight="28" Padding="0"
+                                                        VerticalAlignment="Top"
+                                                        Click="OnRemoveNotificationClick"
+                                                        ToolTipService.ToolTip="Remove notification"
+                                                        AutomationProperties.Name="Remove notification"
+                                                        AutomationProperties.AutomationId="NotificationRemove">
+                                                    <FontIcon Glyph="&#xE711;" FontSize="11" />
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <StackPanel x:Name="NotificationEmptyState" Spacing="8" Padding="8,28"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Border Width="46" Height="46" CornerRadius="14"
+                                            Background="{ThemeResource AccentSubtleBrush}" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xEA8F;" FontSize="20"
+                                                  Foreground="{ThemeResource AccentTextBrush}" />
+                                    </Border>
+                                    <TextBlock Text="No notifications yet" FontSize="13" FontWeight="SemiBold"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="Job results and app updates will appear here."
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               TextAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
+
+        <NavigationView
+            x:Name="Nav"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            IsPaneOpen="True"
+            OpenPaneLength="280"
+            CompactPaneLength="56"
+            PaneDisplayMode="Auto"
+            IsTitleBarAutoPaddingEnabled="False"
+            AlwaysShowHeader="False"
+            SelectionChanged="OnNavSelectionChanged"
+            Background="Transparent">
+
+            <NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewExpandedPaneBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground" Color="Transparent" />
+            </NavigationView.Resources>
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="HomeNav" Content="Home" Tag="Home" AutomationProperties.AutomationId="NavHome">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE80F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ConverterNav" Content="Converter" Tag="Converter" AutomationProperties.AutomationId="NavConverter">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8AB;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="ToolsNav" Content="Media Tools" Tag="Tools" AutomationProperties.AutomationId="NavTools">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8F1;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="OcrNav" Content="OCR Documents" Tag="Ocr" AutomationProperties.AutomationId="NavOcr">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8A5;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="UpscalerNav" Content="Image Upscaler" Tag="Upscaler" AutomationProperties.AutomationId="NavUpscaler">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE71E;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="VideoUpscalerNav" Content="Video Upscaler" Tag="VideoUpscaler" AutomationProperties.AutomationId="NavVideoUpscaler">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B2;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="WatchNav" Content="Watch Folders" Tag="Watch" AutomationProperties.AutomationId="NavWatch">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B7;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="QueueNav" Content="Processing Queue" Tag="Queue" AutomationProperties.AutomationId="NavQueue">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8FD;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="HistoryNav" Content="History" Tag="History" AutomationProperties.AutomationId="NavHistory">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="SettingsNav" Content="Settings" Tag="Settings" AutomationProperties.AutomationId="NavSettings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.PaneFooter>
+                <Button x:Name="QueueStatusCard" Style="{StaticResource CardButtonStyle}"
+                        Margin="8,6,8,10" Padding="10,7" MinHeight="56"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                        AutomationProperties.AutomationId="StatusQueueButton" Click="OnStatusCardClick">
+                    <Grid>
+                        <Grid x:Name="ExpandedStatus" ColumnSpacing="10" RowSpacing="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Ellipse x:Name="StatusDot" Grid.Row="0" Width="8" Height="8" Fill="{ThemeResource TextFillColorSecondaryBrush}"
+                                     VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Grid.Row="0" Spacing="1">
+                                <TextBlock x:Name="StatusTitle" Text="Starting engines…" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="StatusDetail" Text="Local processing" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <ProgressBar x:Name="StatusProgress" Grid.Row="1" Grid.ColumnSpan="2" Height="3" Visibility="Collapsed"
+                                         Minimum="0" Maximum="100" />
+                        </Grid>
+
+                        <StackPanel x:Name="CompactStatus" Visibility="Collapsed" Spacing="1"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Ellipse x:Name="StatusDotCompact" Width="10" Height="10"
+                                     Fill="{ThemeResource TextFillColorSecondaryBrush}"
+                                     HorizontalAlignment="Center" />
+                            <TextBlock x:Name="CompactStatusLabel" Text="Ready" FontSize="9" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+            </NavigationView.PaneFooter>
+
+            <SplitView x:Name="ModelPanelSplitView" PanePlacement="Right" DisplayMode="Overlay"
+                       OpenPaneLength="620" IsPaneOpen="False" Background="Transparent"
+                       PaneBackground="Transparent">
+                <SplitView.Pane>
+                    <Border Margin="8,8,0,8" CornerRadius="18,0,0,18"
+                            Background="{ThemeResource GlassPanelBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <ContentControl x:Name="ModelPanelHost" />
+                    </Border>
+                </SplitView.Pane>
+                <Grid>
+                    <Frame x:Name="ContentFrame" Background="Transparent" />
+                    <StackPanel x:Name="NotificationStack" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Width="380" Margin="0,18,24,0" Spacing="8" Canvas.ZIndex="20" />
+                </Grid>
+            </SplitView>
+        </NavigationView>
+
+        <!-- Persistent accent indicator: a single element animated across the full
+             distance between navigation items. -->
+        <Canvas x:Name="NavIndicatorLayer" Grid.Row="1" IsHitTestVisible="False">
+            <Border x:Name="ActiveNavIndicator" Canvas.Left="2" Canvas.Top="0" Width="3" Height="18"
+                    CornerRadius="2" Background="{ThemeResource AccentPrimaryBrush}" Visibility="Collapsed"
+                    AutomationProperties.AutomationId="ActiveNavIndicator">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ActiveNavIndicatorTransform" Y="0" />
+                </Border.RenderTransform>
+            </Border>
+        </Canvas>
+
+        <!-- Manual sidebar resize boundary. -->
+        <primitives:Thumb x:Name="PaneResizeHandle" Grid.Row="1" Width="8" Canvas.ZIndex="10"
+                          HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                          Visibility="Collapsed"
+                          DragStarted="OnPaneResizeStarted"
+                          DragDelta="OnPaneResizeDelta"
+                          DragCompleted="OnPaneResizeCompleted"
+                          AutomationProperties.Name="Resize navigation sidebar"
+                          AutomationProperties.AutomationId="SidebarResizeHandle">
+            <primitives:Thumb.Template>
+                <ControlTemplate TargetType="primitives:Thumb">
+                    <Grid Background="Transparent">
+                        <Border Width="1" HorizontalAlignment="Center"
+                                Background="{ThemeResource DividerBrush}" Opacity="0.45" />
+                    </Grid>
+                </ControlTemplate>
+            </primitives:Thumb.Template>
+        </primitives:Thumb>
+
+        <Grid x:Name="ClosingOverlay" Grid.RowSpan="2" Background="{ThemeResource OverlayScrimBrush}" Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16">
+                <ProgressRing IsActive="True" Width="40" Height="40" />
+                <TextBlock Text="Finishing background work…" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="PixelForge is stopping active jobs safely before closing." FontSize="12"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

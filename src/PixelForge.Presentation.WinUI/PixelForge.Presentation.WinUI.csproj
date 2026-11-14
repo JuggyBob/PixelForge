@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>PixelForge.Presentation</RootNamespace>
+    <AssemblyName>PixelForge</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\PixelForge.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PixelForge.Domain\PixelForge.Domain.csproj" />
+    <ProjectReference Include="..\PixelForge.Application\PixelForge.Application.csproj" />
+    <ProjectReference Include="..\PixelForge.Infrastructure\PixelForge.Infrastructure.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Images\PixelForge.Engines.Images.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.FFmpeg\PixelForge.Engines.FFmpeg.csproj" />
+    <ProjectReference Include="..\PixelForge.Engines.Upscaling\PixelForge.Engines.Upscaling.csproj" />
+    <ProjectReference Include="..\PixelForge.Composition\PixelForge.Composition.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\ffmpeg\bin\**\*" Link="ffmpeg\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\ffmpeg\LICENSE.txt" Link="ffmpeg\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\fonts\JetBrainsMono\**\*" Link="Assets\Fonts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\fonts\JetBrainsMono\OFL.txt" Link="licenses\JetBrainsMono-OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\documents\**\*" Link="documents\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\archives\**\*" Link="archives\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\audio\rnnoise\**\*" Link="audio\rnnoise\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\third_party\models\segmentation\**\*" Link="models\segmentation\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\PixelForge.Engines.OCR\Resources\**\*" Link="ocr\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    The WinUI/Windows SDK projection assemblies are already native or reference
+    WinMD metadata. Crossgenning them produced unstable images, so keep them out
+    of ReadyToRun while allowing the app and its pure managed dependencies to be
+    precompiled.
+  -->
+  <Target Name="ExcludeWinUIFromReadyToRun" BeforeTargets="_PrepareForReadyToRunCompilation">
+    <ItemGroup>
+      <PublishReadyToRunExclude Include="@(ResolvedFileToPublish->'%(Filename)%(Extension)')"
+                                Condition="$([System.String]::Copy('%(Filename)').StartsWith('Microsoft.'))" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    The WinUI XAML compiler emits .xbf files and the application .pri file into
+    the build output. dotnet publish does not always include those WinUI-generated
+    resources when a custom publish directory is used, which causes a XamlParseException
+    at startup. Copy them explicitly after publish.
+  -->
+  <Target Name="CopyWinUIXamlResourcesToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_WinUIXbf Include="$(OutDir)**\*.xbf" />
+      <_WinUIAppPri Include="$(OutDir)PixelForge.pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_WinUIXbf)"
+          DestinationFiles="@(_WinUIXbf->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_WinUIAppPri)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -1,0 +1,77 @@
+name: Bug report
+description: Report a reproducible PixelForge problem.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Remove personal paths, usernames, media, and credentials from screenshots and logs before submitting.
+        Security issues must be reported privately through SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: PixelForge version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - Setup installer
+        - Portable ZIP
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2 (26100)"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic or non-private files where possible.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove usernames, personal paths, private media, and credentials. Logs are under %LOCALAPPDATA%\PixelForge\logs.
+      render: text
+  - type: input
+    id: hardware
+    attributes:
+      label: Relevant hardware or runtime
+      placeholder: "CPU/GPU, provider, optional model, Vulkan driver, etc."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed personal or sensitive information from this report.
+          required: true
+        - label: I searched for an existing report of this issue.
+          required: true

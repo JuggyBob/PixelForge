@@ -1,0 +1,78 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+_dist/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+
+# Test output and evidence
+testdata/runs/
+testdata/**/output/
+test-results/
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.log
+*.tmp
+*.dmp
+
+# Local application data and models
+*.db
+*.db-shm
+*.db-wal
+models/downloads/
+models/ocr/
+runtimes/
+*.onnx
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+!third_party/models/segmentation/u2netp.onnx
+!third_party/fonts/**/*.ttf
+
+# Release and dependency binaries
+artifacts/installer/
+artifacts/portable/
+artifacts/publish/
+third_party/ffmpeg/bin/
+third_party/ffmpeg/*.zip
+third_party/documents/pandoc/pandoc.exe
+third_party/documents/typst/typst.exe
+third_party/fonts/*.zip
+third_party/models/downloads/
+third_party/notices/downloads/
+tools/InnoSetup/
+
+# Private and machine-specific files
+*.pfx
+*.p12
+*.snk
+*.key
+*.pem
+*.cer
+.env
+.env.*
+secrets.json
+appsettings.local.json
+*.userprefs
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# Local screenshots and generated evidence
+docs/screenshots/*.tmp

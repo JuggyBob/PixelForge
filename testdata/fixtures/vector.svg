@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">
+  <rect width="400" height="240" fill="#13212b"/>
+  <circle cx="120" cy="120" r="72" fill="#2aa7a0"/>
+  <rect x="210" y="58" width="130" height="124" rx="18" fill="#e8833a"/>
+  <text x="24" y="222" font-family="Segoe UI" font-size="24" fill="#ffffff">Vector fixture</text>
+</svg>
