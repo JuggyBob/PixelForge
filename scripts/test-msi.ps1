@@ -71,7 +71,7 @@ Check (Test-RegKey "HKCU\Software\Classes\Directory\shell\PixelForgeFolder") "Ex
 $env:PIXELFORGE_DATA_DIR = $dataDir
 try {
     $version = & (Join-Path $installDir "cli\pixelforge.exe") --version 2>&1
-    Check ($LASTEXITCODE -eq 0 -and $version -match '1\.1') "CLI runs and reports version: $version"
+    Check ($LASTEXITCODE -eq 0 -and $version -match '2\.0') "CLI runs and reports version: $version"
 
     $cliOut = Join-Path $TestRoot "cli-out"
     $sample = Join-Path $root "testdata\fixtures\photo-exif-orientation.jpg"
@@ -134,3 +134,4 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host "MSI verification complete. Logs: $logDir" -ForegroundColor Green
+

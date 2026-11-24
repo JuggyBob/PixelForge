@@ -21,13 +21,13 @@ update check, and an MSI installer.
 | Portable ZIP | [PixelForge-Portable-2.0.0-x64.zip](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/PixelForge-Portable-2.0.0-x64.zip) |
 | Checksums | [SHA256SUMS.txt](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/SHA256SUMS.txt) |
 
-Hash placeholders — replace from `SHA256SUMS.txt` after the final publish:
+Final asset sizes and SHA-256 values:
 
 | Asset | Size | SHA-256 |
 |---|---|---|
-| `PixelForge-Setup-2.0.0-x64.exe` | `TODO` | `TODO` |
-| `PixelForge-Setup-2.0.0-x64.msi` | `TODO` | `TODO` |
-| `PixelForge-Portable-2.0.0-x64.zip` | `TODO` | `TODO` |
+| `PixelForge-Setup-2.0.0-x64.exe` | 183.3 MB | `884c4d1e9a74133b5a3f83a377b9b4114d94037e9a0569d0dd6c145d80622a68` |
+| `PixelForge-Setup-2.0.0-x64.msi` | 225.7 MB | `3c5b133f3a01cf92b9ab7ee99cf165464208541b8cf355a5b86ac0ff14c1554b` |
+| `PixelForge-Portable-2.0.0-x64.zip` | 268.6 MB | `53e81ed558b8dcca44e3cd916e967ae87b45acb6efc4f19c98c2604210948c5d` |
 
 ## Highlights
 
