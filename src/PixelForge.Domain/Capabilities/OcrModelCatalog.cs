@@ -147,11 +147,11 @@ public static class OcrModelCatalog
         LicenseUrl = "https://huggingface.co/zai-org/GLM-OCR",
         Notes = "Optional advanced OCR engine. Uses a local llama.cpp server; PP-OCRv6 remains the default. The official full document pipeline also uses PP-DocLayoutV3, which is not required for this page-level mode.",
         Languages = ["English", "Chinese", "French", "Spanish", "Russian", "German", "Japanese", "Korean"],
-        RuntimeBackend = "llama.cpp b12110 · Vulkan / CPU",
+        RuntimeBackend = "llama.cpp v1.0.0 (b12359) · Vulkan / CPU",
         ProviderSupport = "Vulkan GPU · CPU fallback",
         VerificationStatus = "GGUF SHA-256 verified; inference validated through llama.cpp",
         Backend = OcrBackendKind.LlamaCpp,
-        RuntimeId = "llama-cpp-b12110-vulkan",
+        RuntimeId = "llama-cpp-v1.0.0-vulkan",
         Prompt = "Extract all text in reading order. Preserve tables as Markdown.",
         SortOrder = 100
     };
@@ -187,11 +187,11 @@ public static class OcrModelCatalog
         LicenseUrl = "https://github.com/OpenBMB/MiniCPM-OCR/blob/main/LICENSE",
         Notes = "Optional advanced OCR engine. The official full pipeline uses PP-DocLayoutV3 for layout and region cropping; this integration performs page-level recognition without the layout dependency.",
         Languages = ["English", "Chinese"],
-        RuntimeBackend = "llama.cpp b12110 · Vulkan / CPU",
+        RuntimeBackend = "llama.cpp v1.0.0 (b12359) · Vulkan / CPU",
         ProviderSupport = "Vulkan GPU · CPU fallback",
         VerificationStatus = "GGUF SHA-256 verified; inference validated through llama.cpp",
         Backend = OcrBackendKind.LlamaCpp,
-        RuntimeId = "llama-cpp-b12110-vulkan",
+        RuntimeId = "llama-cpp-v1.0.0-vulkan",
         Prompt = "Extract all text in reading order. Preserve tables as Markdown.",
         SortOrder = 101
     };
@@ -227,11 +227,11 @@ public static class OcrModelCatalog
         LicenseUrl = "https://github.com/xiaomi-research/Xiaomi-OCR-0",
         Notes = "Optional advanced OCR engine. Uses a community GGUF conversion of the official Apache-2.0 checkpoint; page-level recognition only. The official two-stage pipeline uses PP-DocLayoutV3.",
         Languages = ["English", "Chinese"],
-        RuntimeBackend = "llama.cpp b12110 · Vulkan / CPU",
+        RuntimeBackend = "llama.cpp v1.0.0 (b12359) · Vulkan / CPU",
         ProviderSupport = "Vulkan GPU · CPU fallback",
         VerificationStatus = "GGUF SHA-256 verified; inference validated through llama.cpp",
         Backend = OcrBackendKind.LlamaCpp,
-        RuntimeId = "llama-cpp-b12110-vulkan",
+        RuntimeId = "llama-cpp-v1.0.0-vulkan",
         Prompt = "Extract all text in reading order. Preserve tables as Markdown.",
         SortOrder = 102
     };

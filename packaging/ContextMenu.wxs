@@ -1,0 +1,551 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <ComponentGroup Id="ContextMenu">
+      <Component Id="ExplorerImages" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A10}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextImages" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.png\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.jpg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.jpeg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.jpe\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.jfif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.webp\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.avif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.heic\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.heif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.bmp\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.dib\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.jxl\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.tga\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.targa\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pnm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ppm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pgm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pbm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.exr\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.hdr\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pic\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.qoi\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.dds\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pcx\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.xcf\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.dng\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.cr2\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.nef\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.arw\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Images" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\Images\Shell">
+          <RegistryKey Key="ConvertImages">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert image with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-images &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="UpscaleImage">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Upscale image with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell upscale-image &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="OcrImage">
+            <RegistryValue Name="MUIVerb" Type="string" Value="OCR image with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell ocr &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerImagesConvertOnly" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A11}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextImagesConvertOnly" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ico\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.tif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.tiff\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.psd\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.psb\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.svg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.svgz\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesConvertOnly" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\ImagesConvertOnly\Shell">
+          <RegistryKey Key="ConvertImages">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert image with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-images &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerImagesVideo" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A12}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextImagesVideo" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.gif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\ImagesVideo" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\ImagesVideo\Shell">
+          <RegistryKey Key="ConvertImages">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert image with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-images &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="ConvertVideo">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert video with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-video &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="UpscaleVideo">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Upscale video with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell upscale-video &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerAudio" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A13}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextAudio" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mp3\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.wav\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.wave\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.flac\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.m4a\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.aac\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.adts\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ogg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.oga\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.opus\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.wma\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.aiff\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.aif\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.aifc\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mka\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.amr\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ac3\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.dts\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.caf\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ape\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.wv\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Audio" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\Audio\Shell">
+          <RegistryKey Key="ConvertAudio">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert audio with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-audio &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerVideo" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A14}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextVideo" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mp4\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.m4v\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mkv\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mov\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.qt\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.webm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.avi\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.wmv\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mpg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mpeg\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ts\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.m2ts\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mts\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.3gp\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.3g2\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.ogv\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.flv\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.vob\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.mxf\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.f4v\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Video" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\Video\Shell">
+          <RegistryKey Key="ConvertVideo">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert video with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-video &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="UpscaleVideo">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Upscale video with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell upscale-video &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerDocumentsEbooks" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A15}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextDocumentsEbooks" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.pdf\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.docx\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.odt\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.html\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.htm\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.md\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.markdown\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.txt\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.text\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.epub\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\DocumentsEbooks" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\DocumentsEbooks\Shell">
+          <RegistryKey Key="ConvertDocuments">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert document with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-documents &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+          <RegistryKey Key="ConvertEbooks">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert e-book with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-ebooks &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerDocuments" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A16}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextDocuments" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.rtf\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Documents" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\Documents\Shell">
+          <RegistryKey Key="ConvertDocuments">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Convert document with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-documents &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerArchives" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A17}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextArchives" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.zip\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.7z\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.tar\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.gz\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.gzip\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.bz2\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.bzip2\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.xz\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.zst\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="SystemFileAssociations\.zstd\shell\PixelForge">
+          <RegistryValue Name="MUIVerb" Type="string" Value="PixelForge" />
+          <RegistryValue Name="ExtendedSubCommandsKey" Type="string" Value="Software\PixelForge\ShellMenu\Archives" />
+        </RegistryKey>
+        <RegistryKey Root="HKCR" Key="Software\PixelForge\ShellMenu\Archives\Shell">
+          <RegistryKey Key="ConvertArchives">
+            <RegistryValue Name="MUIVerb" Type="string" Value="Process archive with PixelForge" />
+            <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+            <RegistryKey Key="command">
+              <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell convert-archives &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+      <Component Id="ExplorerFolder" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A18}">
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="ContextFolder" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCR" Key="Directory\shell\PixelForgeFolder">
+          <RegistryValue Name="MUIVerb" Type="string" Value="Scan folder as images with PixelForge" />
+          <RegistryValue Name="MultiSelectModel" Type="string" Value="Player" />
+          <RegistryKey Key="command">
+            <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]PixelForge.exe&quot; --shell scan-images-folder &quot;%1&quot;" />
+          </RegistryKey>
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>
+

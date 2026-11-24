@@ -1,5 +1,7 @@
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PixelForge.Domain;
@@ -10,10 +12,24 @@ using PixelForge.Domain.Models;
 namespace PixelForge.Presentation.ViewModels;
 
 public sealed record VideoCodecItem(string Id, string DisplayName, string TechnicalId, bool IsCopy,
-    IReadOnlyList<EncoderCapability> Encoders);
+    IReadOnlyList<EncoderCapability> Encoders) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => Loc.T(DisplayName);
+    public override string ToString() => DisplayLabel;
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+}
 
 public sealed record VideoAudioCodecItem(string Id, string DisplayName, bool IsCopy, bool IsNone,
-    IReadOnlyList<EncoderCapability> Encoders);
+    IReadOnlyList<EncoderCapability> Encoders) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => Loc.T(DisplayName);
+    public override string ToString() => DisplayLabel;
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+}
 
 public sealed partial class VideoWorkspaceViewModel : WorkspaceViewModel
 {
@@ -35,7 +51,7 @@ public sealed partial class VideoWorkspaceViewModel : WorkspaceViewModel
     }
 
     public override OperationKind Operation => OperationKind.VideoConvert;
-    public override string CategoryTitle => "Video";
+    public override string CategoryTitle => LocalizationService.T("Video");
     public override string CategorySubtitle => "Remux or transcode video and audio streams with verification.";
     public override string CategoryGlyph => "\uE714";
 
@@ -82,6 +98,29 @@ public sealed partial class VideoWorkspaceViewModel : WorkspaceViewModel
         new(ConversionPreset.Balanced, "Balanced"),
         new(ConversionPreset.HighQuality, "High quality")
     ];
+
+    public override void RefreshLocalization()
+    {
+        base.RefreshLocalization();
+        foreach (var option in RateControlOptions) option.RefreshLocalization();
+        foreach (var option in ResizeModes) option.RefreshLocalization();
+        foreach (var option in SubtitleModes) option.RefreshLocalization();
+        foreach (var option in AudioBitrateOptions) option.RefreshLocalization();
+        foreach (var option in SampleRateOptions) option.RefreshLocalization();
+        foreach (var option in ChannelOptions) option.RefreshLocalization();
+        foreach (var option in PresetOptions) option.RefreshLocalization();
+        foreach (var codec in VideoCodecs) codec.RefreshLocalization();
+        foreach (var codec in AudioCodecs) codec.RefreshLocalization();
+        SelectedVideoCodec?.RefreshLocalization();
+        SelectedAudioCodec?.RefreshLocalization();
+        SelectedPreset.RefreshLocalization();
+        SelectedRateControl.RefreshLocalization();
+        SelectedAudioBitrate.RefreshLocalization();
+        SelectedAudioSampleRate.RefreshLocalization();
+        SelectedAudioChannels.RefreshLocalization();
+        SelectedResizeMode.RefreshLocalization();
+        SelectedSubtitleMode.RefreshLocalization();
+    }
 
     [ObservableProperty] private ObservableCollection<VideoCodecItem> _videoCodecs = [];
     [ObservableProperty] private VideoCodecItem? _selectedVideoCodec;
@@ -140,7 +179,8 @@ public sealed partial class VideoWorkspaceViewModel : WorkspaceViewModel
     public double QualityMaximum => SelectedVideoEncoder?.QualityMax ?? 63;
     public string EncoderHint => SelectedVideoEncoder?.Notes ?? SelectedVideoEncoder?.DisplayName ?? "Choose an encoder";
     public string AudioEncoderHint => SelectedAudioEncoder?.Notes ?? SelectedAudioEncoder?.DisplayName ?? "Choose an audio encoder";
-    public string ModeTitle => IsVideoCopy && (IsAudioCopy || IsAudioNone) ? "Remux — no re-encode" : "Transcode";
+    public string ModeTitle => LocalizationService.T(
+        IsVideoCopy && (IsAudioCopy || IsAudioNone) ? "Remux — no re-encode" : "Transcode");
     public string ModeDescription => IsVideoCopy
         ? "The video stream is copied without quality loss. Container compatibility is verified before processing."
         : "The video stream is re-encoded with the selected encoder. Quality settings use the encoder's native parameter.";
@@ -270,15 +310,17 @@ public sealed partial class VideoWorkspaceViewModel : WorkspaceViewModel
 
     protected override string BuildSummary()
     {
-        if (SelectedFormat is null) return "Choose a video container";
+        if (SelectedFormat is null) return LocalizationService.T("Choose a video container");
         if (IsVideoCopy && (IsAudioCopy || IsAudioNone))
-            return $"{FileCountText} → {SelectedFormat.ExtensionUpper} · remux · no video re-encode";
-        var video = SelectedVideoCodec?.DisplayName ?? "video";
-        var audio = IsAudioNone ? "no audio" : SelectedAudioCodec?.DisplayName ?? "audio";
+            return $"{FileCountText} → {SelectedFormat.ExtensionUpper} · {LocalizationService.T("remux")} · {LocalizationService.T("no video re-encode")}";
+        var video = SelectedVideoCodec?.DisplayName ?? LocalizationService.T("video");
+        var audio = IsAudioNone ? LocalizationService.T("no audio") : SelectedAudioCodec?.DisplayName ?? LocalizationService.T("audio");
         return $"{FileCountText} → {SelectedFormat.ExtensionUpper} · {video} · {audio}";
     }
 
-    protected override string BuildDefaultTitle() => $"Convert {FileCountText} to {SelectedFormat?.ExtensionUpper ?? "video"}";
+    protected override string BuildDefaultTitle() =>
+        LocalizationService.F("Convert {0} to {1}", FileCountText,
+            SelectedFormat?.ExtensionUpper ?? LocalizationService.T("video"));
 
     public override bool Accepts(MediaInfo info) => info.Category == MediaCategory.Video;
 

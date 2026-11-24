@@ -4,8 +4,8 @@ PixelForge itself is licensed under the Apache License 2.0. See `LICENSE` and
 `NOTICE`. Third-party components remain under their own licenses; the PixelForge
 license does not replace those terms.
 
-This document covers the components redistributed in the PixelForge 1.0.0
-installer and portable archive, plus optional runtimes and model weights that
+This document covers the components redistributed in the PixelForge 2.0.0
+installer, MSI, and portable archive, plus optional runtimes and model weights that
 users download explicitly. Full license texts are in `licenses/`. Component
 license files shipped beside the binaries (for example `ffmpeg/LICENSE.txt`,
 `documents/pandoc/COPYING.rtf`, and `archives/LICENSE.txt`) are also part of the
@@ -15,7 +15,7 @@ distribution.
 
 | Component | Version | License | Distribution | Source |
 |---|---|---|---|---|
-| PixelForge | 1.0.0 | Apache-2.0 | Application | https://github.com/JuggyBob/PixelForge |
+| PixelForge | 2.0.0 | Apache-2.0 | Application | https://github.com/JuggyBob/PixelForge |
 | FFmpeg / FFprobe | 9.0.2 | LGPL-3.0 (custom build, `--disable-gpl --disable-nonfree`) | Bundled executables and shared libraries | https://ffmpeg.org/ |
 | Pandoc | 3.13 | GPL-2.0-or-later | Bundled separate executable | https://github.com/jgm/pandoc |
 | Typst | 0.15.1 | Apache-2.0 | Bundled separate executable | https://github.com/typst/typst |
@@ -36,6 +36,7 @@ distribution.
 | RNNoise model (`std.rnnn`) | Xiph reference model | BSD-3-Clause | Bundled model | https://github.com/xiph/rnnoise |
 | u2netp segmentation model | nfa04 ONNX conversion | Apache-2.0 | Bundled model | https://huggingface.co/nfa04/u2netp-onnx |
 | PaddleOCR dictionaries | PP-OCRv6 resources | Apache-2.0 | Bundled dictionaries | https://github.com/PaddlePaddle/PaddleOCR |
+| Language flag assets | Flagcdn PNGs | Public domain | Bundled UI decoration for the language selector | https://flagcdn.com/ |
 
 ## FFmpeg
 
@@ -135,7 +136,7 @@ These packages are downloaded on demand and are not part of the installer:
 |---|---|---|---|
 | waifu2x-ncnn-vulkan | 2022-07-28 | MIT | https://github.com/nihui/waifu2x-ncnn-vulkan |
 | realcugan-ncnn-vulkan | 2022-07-28 | MIT (wrapper and Real-CUGAN weights) | https://github.com/nihui/realcugan-ncnn-vulkan |
-| llama.cpp Vulkan package | b12110 | MIT | https://github.com/ggml-org/llama.cpp |
+| llama.cpp Vulkan package | v1.0.0 (b12359) | MIT | https://github.com/ggml-org/llama.cpp |
 
 ## Optional model weights
 

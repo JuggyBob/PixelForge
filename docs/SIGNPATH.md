@@ -101,12 +101,14 @@ must match the project, policy, and artifact configurations exactly.
 
 ## 6. Build a signed release
 
-Do not replace the existing unsigned `v1.0.0` assets. Create a new version, for
-example `v1.0.1`:
+PixelForge 2.0.0 was published **unsigned**; SignPath is not configured for it
+and no signing request was submitted. This section applies only to the future
+first signed release. Do not replace existing release assets. Create a new
+version, for example `v2.0.1`:
 
 ```powershell
-git tag -a v1.0.1 -m "PixelForge 1.0.1"
-git push origin v1.0.1
+git tag -a v2.0.1 -m "PixelForge 2.0.1"
+git push origin v2.0.1
 ```
 
 The [`release-sign`](../.github/workflows/release-sign.yml) workflow:
@@ -132,11 +134,11 @@ stable release automatically.
 ## 7. Verify locally
 
 ```powershell
-Get-AuthenticodeSignature .\PixelForge-Setup-1.0.1-x64.exe |
+Get-AuthenticodeSignature .\PixelForge-Setup-2.0.1-x64.exe |
   Format-List Status, StatusMessage, SignerCertificate, TimeStamperCertificate
 
-Get-FileHash .\PixelForge-Setup-1.0.1-x64.exe -Algorithm SHA256
-Get-FileHash .\PixelForge-Portable-1.0.1-x64.zip -Algorithm SHA256
+Get-FileHash .\PixelForge-Setup-2.0.1-x64.exe -Algorithm SHA256
+Get-FileHash .\PixelForge-Portable-2.0.1-x64.zip -Algorithm SHA256
 ```
 
 The signer subject should contain `SignPath Foundation`, `Status` should be

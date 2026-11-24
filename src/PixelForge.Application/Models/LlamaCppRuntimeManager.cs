@@ -85,52 +85,34 @@ public sealed class LlamaCppRuntimeManager : ILlamaCppRuntimeManager
         await _gate.WaitAsync(cancellationToken);
         string? tempZip = null;
         string? tempExtract = null;
+        var preservePartial = false;
         try
         {
             Directory.CreateDirectory(RuntimeDirectory);
             tempZip = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName + ".download.zip");
             tempExtract = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName + ".extract");
-            if (File.Exists(tempZip)) File.Delete(tempZip);
             if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, recursive: true);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, descriptor.DownloadUrl);
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            try
+            {
+                await ResumableDownloader.DownloadAsync(_httpClient, descriptor.DownloadUrl, tempZip,
+                    descriptor.FileSizeBytes,
+                    (received, total) => progress?.Report(new LlamaCppDownloadProgress
+                    {
+                        RuntimeId = descriptor.Id,
+                        BytesReceived = received,
+                        TotalBytes = total,
+                        Stage = "Downloading"
+                    }), cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return new LlamaCppDownloadResult
                 {
                     Success = false,
-                    Error = $"The llama.cpp server returned {(int)response.StatusCode} {response.ReasonPhrase}.",
+                    Error = ex.Message,
                     Details = descriptor.DownloadUrl
                 };
-            }
-
-            var total = response.Content.Headers.ContentLength ?? descriptor.FileSizeBytes;
-            await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var target = new FileStream(tempZip, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                             128 * 1024, useAsync: true))
-            {
-                var buffer = new byte[128 * 1024];
-                long received = 0;
-                var lastReport = 0L;
-                while (true)
-                {
-                    var read = await source.ReadAsync(buffer, cancellationToken);
-                    if (read <= 0) break;
-                    await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    received += read;
-                    if (Environment.TickCount64 - lastReport > 120)
-                    {
-                        lastReport = Environment.TickCount64;
-                        progress?.Report(new LlamaCppDownloadProgress
-                        {
-                            RuntimeId = descriptor.Id,
-                            BytesReceived = received,
-                            TotalBytes = total,
-                            Stage = "Downloading"
-                        });
-                    }
-                }
             }
 
             progress?.Report(new LlamaCppDownloadProgress
@@ -182,8 +164,7 @@ public sealed class LlamaCppRuntimeManager : ILlamaCppRuntimeManager
             }
 
             var finalDirectory = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName);
-            if (Directory.Exists(finalDirectory)) Directory.Delete(finalDirectory, recursive: true);
-            Directory.Move(tempExtract, finalDirectory);
+            InstallDirectoryTransactional(tempExtract, finalDirectory);
             tempExtract = null;
 
             var installed = Inspect(descriptor, hash);
@@ -200,6 +181,7 @@ public sealed class LlamaCppRuntimeManager : ILlamaCppRuntimeManager
         }
         catch (OperationCanceledException)
         {
+            preservePartial = true;
             return new LlamaCppDownloadResult { Success = false, Error = "The llama.cpp runtime download was cancelled." };
         }
         catch (Exception ex)
@@ -214,8 +196,11 @@ public sealed class LlamaCppRuntimeManager : ILlamaCppRuntimeManager
         }
         finally
         {
-            try { if (tempZip is not null && File.Exists(tempZip)) File.Delete(tempZip); } catch { }
-            try { if (tempExtract is not null && Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true); } catch { }
+            if (!preservePartial)
+            {
+                try { if (tempZip is not null && File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+                try { if (tempExtract is not null && Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true); } catch { }
+            }
             _gate.Release();
         }
     }
@@ -357,6 +342,32 @@ public sealed class LlamaCppRuntimeManager : ILlamaCppRuntimeManager
                 throw new InvalidDataException("The runtime archive contains an unsafe path.");
         }
         archive.ExtractToDirectory(destination, overwriteFiles: true);
+    }
+
+    private static void InstallDirectoryTransactional(string staging, string destination)
+    {
+        var backup = destination + ".backup";
+        if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        if (Directory.Exists(destination)) Directory.Move(destination, backup);
+        try
+        {
+            Directory.Move(staging, destination);
+            if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
+                if (Directory.Exists(backup)) Directory.Move(backup, destination);
+            }
+            catch
+            {
+                // Keep the original error; a leftover backup remains recoverable.
+            }
+
+            throw;
+        }
     }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)

@@ -44,7 +44,11 @@ public sealed class JobRepository : IJobRepository
                     ErrorDetails TEXT NULL,
                     SourcePath TEXT NULL,
                     PreserveRelativePaths INTEGER NOT NULL DEFAULT 0,
-                    BatchSummary TEXT NULL
+                    BatchSummary TEXT NULL,
+                    PipelineId TEXT NULL,
+                    PipelineName TEXT NULL,
+                    PipelineStep INTEGER NOT NULL DEFAULT 0,
+                    PipelineStepCount INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS JobItems (
                     Id TEXT PRIMARY KEY,
@@ -52,6 +56,7 @@ public sealed class JobRepository : IJobRepository
                     InputPath TEXT NOT NULL,
                     FileName TEXT NOT NULL,
                     RelativeDirectory TEXT NULL,
+                    PreferredOutputName TEXT NULL,
                     OutputPath TEXT NULL,
                     TempPath TEXT NULL,
                     State INTEGER NOT NULL,
@@ -59,6 +64,13 @@ public sealed class JobRepository : IJobRepository
                     Message TEXT NULL,
                     Error TEXT NULL,
                     ErrorDetails TEXT NULL,
+                    ErrorCategory TEXT NULL,
+                    EngineLog TEXT NULL,
+                    RequestedProvider TEXT NULL,
+                    ActualProvider TEXT NULL,
+                    FallbackReason TEXT NULL,
+                    RuntimeVersion TEXT NULL,
+                    ModelId TEXT NULL,
                     SkipReason TEXT NULL,
                     StartedAt TEXT NULL,
                     CompletedAt TEXT NULL,
@@ -69,6 +81,7 @@ public sealed class JobRepository : IJobRepository
                     InputInfoJson TEXT NULL,
                     OutputInfoJson TEXT NULL,
                     OutputFormatId TEXT NULL,
+                    AdditionalOutputPathsJson TEXT NULL,
                     WarningsJson TEXT NULL,
                     VerificationSummary TEXT NULL,
                     IsBatchChild INTEGER NOT NULL,
@@ -80,7 +93,59 @@ public sealed class JobRepository : IJobRepository
                 CREATE INDEX IF NOT EXISTS IX_JobItems_JobId ON JobItems(JobId, SortOrder);
                 """;
             await command.ExecuteNonQueryAsync(cancellationToken);
+            foreach (var (name, definition) in new[]
+                     {
+                         ("ErrorCategory", "TEXT NULL"),
+                         ("EngineLog", "TEXT NULL"),
+                         ("RequestedProvider", "TEXT NULL"),
+                         ("ActualProvider", "TEXT NULL"),
+                         ("FallbackReason", "TEXT NULL"),
+                         ("RuntimeVersion", "TEXT NULL"),
+                         ("ModelId", "TEXT NULL"),
+                         ("PreferredOutputName", "TEXT NULL"),
+                         ("AdditionalOutputPathsJson", "TEXT NULL")
+                     })
+                await EnsureItemColumnAsync(connection, transaction, name, definition, cancellationToken);
+
+            foreach (var (name, definition) in new[]
+                     {
+                         ("PipelineId", "TEXT NULL"),
+                         ("PipelineName", "TEXT NULL"),
+                         ("PipelineStep", "INTEGER NOT NULL DEFAULT 0"),
+                         ("PipelineStepCount", "INTEGER NOT NULL DEFAULT 0")
+                     })
+                await EnsureColumnAsync(connection, transaction, "Jobs", name, definition, cancellationToken);
         }, cancellationToken);
+    }
+
+    private static Task EnsureItemColumnAsync(SqliteConnection connection, SqliteTransaction transaction,
+        string name, string definition, CancellationToken cancellationToken) =>
+        EnsureColumnAsync(connection, transaction, "JobItems", name, definition, cancellationToken);
+
+    private static async Task EnsureColumnAsync(SqliteConnection connection, SqliteTransaction transaction,
+        string table, string name, string definition, CancellationToken cancellationToken)
+    {
+        var exists = false;
+        await using (var info = connection.CreateCommand())
+        {
+            info.Transaction = transaction;
+            info.CommandText = $"PRAGMA table_info({table});";
+            await using var reader = await info.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), name, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+
+        if (exists) return;
+        await using var alter = connection.CreateCommand();
+        alter.Transaction = transaction;
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {name} {definition};";
+        await alter.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task SaveAsync(ProcessingJob job, CancellationToken cancellationToken = default)
@@ -243,9 +308,11 @@ public sealed class JobRepository : IJobRepository
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO Jobs (Id, Operation, Title, State, CreatedAt, StartedAt, CompletedAt, SettingsJson,
-                EngineId, OutputDirectory, Error, ErrorDetails, SourcePath, PreserveRelativePaths, BatchSummary)
+                EngineId, OutputDirectory, Error, ErrorDetails, SourcePath, PreserveRelativePaths, BatchSummary,
+                PipelineId, PipelineName, PipelineStep, PipelineStepCount)
             VALUES ($id, $operation, $title, $state, $created, $started, $completed, $settings,
-                $engine, $output, $error, $details, $source, $preserve, $batch)
+                $engine, $output, $error, $details, $source, $preserve, $batch,
+                $pipelineId, $pipelineName, $pipelineStep, $pipelineStepCount)
             ON CONFLICT(Id) DO UPDATE SET
                 State=excluded.State,
                 StartedAt=excluded.StartedAt,
@@ -255,7 +322,11 @@ public sealed class JobRepository : IJobRepository
                 OutputDirectory=excluded.OutputDirectory,
                 Error=excluded.Error,
                 ErrorDetails=excluded.ErrorDetails,
-                BatchSummary=excluded.BatchSummary
+                BatchSummary=excluded.BatchSummary,
+                PipelineId=excluded.PipelineId,
+                PipelineName=excluded.PipelineName,
+                PipelineStep=excluded.PipelineStep,
+                PipelineStepCount=excluded.PipelineStepCount
             """;
         command.Parameters.AddWithValue("$id", job.Id.ToString("D"));
         command.Parameters.AddWithValue("$operation", (int)job.Operation);
@@ -272,6 +343,10 @@ public sealed class JobRepository : IJobRepository
         command.Parameters.AddWithValue("$source", (object?)job.SourcePath ?? DBNull.Value);
         command.Parameters.AddWithValue("$preserve", job.PreserveRelativePaths ? 1 : 0);
         command.Parameters.AddWithValue("$batch", (object?)job.BatchSummary ?? DBNull.Value);
+        command.Parameters.AddWithValue("$pipelineId", (object?)job.PipelineId?.ToString("D") ?? DBNull.Value);
+        command.Parameters.AddWithValue("$pipelineName", (object?)job.PipelineName ?? DBNull.Value);
+        command.Parameters.AddWithValue("$pipelineStep", job.PipelineStep);
+        command.Parameters.AddWithValue("$pipelineStepCount", job.PipelineStepCount);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -281,13 +356,15 @@ public sealed class JobRepository : IJobRepository
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT INTO JobItems (Id, JobId, InputPath, FileName, RelativeDirectory, OutputPath, TempPath,
-                State, Progress, Message, Error, ErrorDetails, SkipReason, StartedAt, CompletedAt, DurationMs,
-                InputBytes, OutputBytes, Attempt, InputInfoJson, OutputInfoJson, OutputFormatId, WarningsJson,
-                VerificationSummary, IsBatchChild, SortOrder)
-            VALUES ($id, $jobId, $input, $fileName, $relative, $output, $temp, $state, $progress, $message,
-                $error, $details, $skip, $started, $completed, $duration, $inputBytes, $outputBytes, $attempt,
-                $inputInfo, $outputInfo, $format, $warnings, $verification, $batchChild, $sort)
+            INSERT INTO JobItems (Id, JobId, InputPath, FileName, RelativeDirectory, PreferredOutputName,
+                OutputPath, TempPath, State, Progress, Message, Error, ErrorDetails, ErrorCategory, EngineLog,
+                RequestedProvider, ActualProvider, FallbackReason, RuntimeVersion, ModelId, SkipReason, StartedAt,
+                CompletedAt, DurationMs, InputBytes, OutputBytes, Attempt, InputInfoJson, OutputInfoJson,
+                OutputFormatId, AdditionalOutputPathsJson, WarningsJson, VerificationSummary, IsBatchChild, SortOrder)
+            VALUES ($id, $jobId, $input, $fileName, $relative, $preferred, $output, $temp, $state, $progress,
+                $message, $error, $details, $errorCategory, $engineLog, $requestedProvider, $actualProvider,
+                $fallback, $runtime, $model, $skip, $started, $completed, $duration, $inputBytes, $outputBytes,
+                $attempt, $inputInfo, $outputInfo, $format, $additional, $warnings, $verification, $batchChild, $sort)
             ON CONFLICT(Id) DO UPDATE SET
                 OutputPath=excluded.OutputPath,
                 TempPath=excluded.TempPath,
@@ -296,13 +373,23 @@ public sealed class JobRepository : IJobRepository
                 Message=excluded.Message,
                 Error=excluded.Error,
                 ErrorDetails=excluded.ErrorDetails,
+                ErrorCategory=excluded.ErrorCategory,
+                EngineLog=excluded.EngineLog,
+                RequestedProvider=excluded.RequestedProvider,
+                ActualProvider=excluded.ActualProvider,
+                FallbackReason=excluded.FallbackReason,
+                RuntimeVersion=excluded.RuntimeVersion,
+                ModelId=excluded.ModelId,
                 SkipReason=excluded.SkipReason,
                 StartedAt=excluded.StartedAt,
                 CompletedAt=excluded.CompletedAt,
                 DurationMs=excluded.DurationMs,
                 OutputBytes=excluded.OutputBytes,
                 Attempt=excluded.Attempt,
+                InputInfoJson=excluded.InputInfoJson,
                 OutputInfoJson=excluded.OutputInfoJson,
+                OutputFormatId=excluded.OutputFormatId,
+                AdditionalOutputPathsJson=excluded.AdditionalOutputPathsJson,
                 WarningsJson=excluded.WarningsJson,
                 VerificationSummary=excluded.VerificationSummary
             """;
@@ -311,6 +398,7 @@ public sealed class JobRepository : IJobRepository
         command.Parameters.AddWithValue("$input", item.InputPath);
         command.Parameters.AddWithValue("$fileName", item.FileName);
         command.Parameters.AddWithValue("$relative", (object?)item.RelativeDirectory ?? DBNull.Value);
+        command.Parameters.AddWithValue("$preferred", (object?)item.PreferredOutputName ?? DBNull.Value);
         command.Parameters.AddWithValue("$output", (object?)item.OutputPath ?? DBNull.Value);
         command.Parameters.AddWithValue("$temp", (object?)item.TempPath ?? DBNull.Value);
         command.Parameters.AddWithValue("$state", (int)item.State);
@@ -318,6 +406,13 @@ public sealed class JobRepository : IJobRepository
         command.Parameters.AddWithValue("$message", (object?)item.Message ?? DBNull.Value);
         command.Parameters.AddWithValue("$error", (object?)item.Error ?? DBNull.Value);
         command.Parameters.AddWithValue("$details", (object?)item.ErrorDetails ?? DBNull.Value);
+        command.Parameters.AddWithValue("$errorCategory", (object?)item.ErrorCategory ?? DBNull.Value);
+        command.Parameters.AddWithValue("$engineLog", (object?)item.EngineLog ?? DBNull.Value);
+        command.Parameters.AddWithValue("$requestedProvider", (object?)item.RequestedProvider ?? DBNull.Value);
+        command.Parameters.AddWithValue("$actualProvider", (object?)item.ActualProvider ?? DBNull.Value);
+        command.Parameters.AddWithValue("$fallback", (object?)item.FallbackReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("$runtime", (object?)item.RuntimeVersion ?? DBNull.Value);
+        command.Parameters.AddWithValue("$model", (object?)item.ModelId ?? DBNull.Value);
         command.Parameters.AddWithValue("$skip", (object?)item.SkipReason ?? DBNull.Value);
         command.Parameters.AddWithValue("$started", (object?)item.StartedAt?.ToString("O", CultureInfo.InvariantCulture) ?? DBNull.Value);
         command.Parameters.AddWithValue("$completed", (object?)item.CompletedAt?.ToString("O", CultureInfo.InvariantCulture) ?? DBNull.Value);
@@ -328,6 +423,8 @@ public sealed class JobRepository : IJobRepository
         command.Parameters.AddWithValue("$inputInfo", (object?)PersistenceJson.Serialize(item.InputInfo) ?? DBNull.Value);
         command.Parameters.AddWithValue("$outputInfo", (object?)PersistenceJson.Serialize(item.OutputInfo) ?? DBNull.Value);
         command.Parameters.AddWithValue("$format", (object?)item.OutputFormatId ?? DBNull.Value);
+        command.Parameters.AddWithValue("$additional",
+            (object?)PersistenceJson.Serialize(item.AdditionalOutputPaths) ?? DBNull.Value);
         command.Parameters.AddWithValue("$warnings", (object?)PersistenceJson.Serialize(item.Warnings) ?? DBNull.Value);
         command.Parameters.AddWithValue("$verification", (object?)item.VerificationSummary ?? DBNull.Value);
         command.Parameters.AddWithValue("$batchChild", item.IsBatchChild ? 1 : 0);
@@ -355,8 +452,22 @@ public sealed class JobRepository : IJobRepository
             ErrorDetails = GetNullableString(reader, "ErrorDetails"),
             SourcePath = GetNullableString(reader, "SourcePath"),
             PreserveRelativePaths = reader.GetInt32(reader.GetOrdinal("PreserveRelativePaths")) != 0,
-            BatchSummary = GetNullableString(reader, "BatchSummary")
+            BatchSummary = GetNullableString(reader, "BatchSummary"),
+            PipelineId = GetNullableGuid(reader, "PipelineId"),
+            PipelineName = GetNullableString(reader, "PipelineName"),
+            PipelineStep = reader.IsDBNull(reader.GetOrdinal("PipelineStep"))
+                ? 0
+                : reader.GetInt32(reader.GetOrdinal("PipelineStep")),
+            PipelineStepCount = reader.IsDBNull(reader.GetOrdinal("PipelineStepCount"))
+                ? 0
+                : reader.GetInt32(reader.GetOrdinal("PipelineStepCount"))
         };
+    }
+
+    private static Guid? GetNullableGuid(SqliteDataReader reader, string column)
+    {
+        var value = GetNullableString(reader, column);
+        return Guid.TryParse(value, out var id) ? id : null;
     }
 
     private static JobItem ReadItem(SqliteDataReader reader)
@@ -369,6 +480,7 @@ public sealed class JobRepository : IJobRepository
             InputPath = reader.GetString(reader.GetOrdinal("InputPath")),
             FileName = reader.GetString(reader.GetOrdinal("FileName")),
             RelativeDirectory = GetNullableString(reader, "RelativeDirectory"),
+            PreferredOutputName = GetNullableString(reader, "PreferredOutputName"),
             OutputPath = GetNullableString(reader, "OutputPath"),
             TempPath = GetNullableString(reader, "TempPath"),
             State = state,
@@ -376,6 +488,13 @@ public sealed class JobRepository : IJobRepository
             Message = GetNullableString(reader, "Message"),
             Error = GetNullableString(reader, "Error"),
             ErrorDetails = GetNullableString(reader, "ErrorDetails"),
+            ErrorCategory = GetNullableString(reader, "ErrorCategory"),
+            EngineLog = GetNullableString(reader, "EngineLog"),
+            RequestedProvider = GetNullableString(reader, "RequestedProvider"),
+            ActualProvider = GetNullableString(reader, "ActualProvider"),
+            FallbackReason = GetNullableString(reader, "FallbackReason"),
+            RuntimeVersion = GetNullableString(reader, "RuntimeVersion"),
+            ModelId = GetNullableString(reader, "ModelId"),
             SkipReason = GetNullableString(reader, "SkipReason"),
             StartedAt = ParseDate(reader, "StartedAt"),
             CompletedAt = ParseDate(reader, "CompletedAt"),
@@ -390,6 +509,8 @@ public sealed class JobRepository : IJobRepository
             InputInfo = PersistenceJson.Deserialize<MediaInfo>(GetNullableString(reader, "InputInfoJson")),
             OutputInfo = PersistenceJson.Deserialize<MediaInfo>(GetNullableString(reader, "OutputInfoJson")),
             OutputFormatId = GetNullableString(reader, "OutputFormatId"),
+            AdditionalOutputPaths = PersistenceJson.Deserialize<List<string>>(
+                GetNullableString(reader, "AdditionalOutputPathsJson")) ?? [],
             Warnings = PersistenceJson.Deserialize<List<string>>(GetNullableString(reader, "WarningsJson")) ?? [],
             VerificationSummary = GetNullableString(reader, "VerificationSummary"),
             IsBatchChild = reader.GetInt32(reader.GetOrdinal("IsBatchChild")) != 0,

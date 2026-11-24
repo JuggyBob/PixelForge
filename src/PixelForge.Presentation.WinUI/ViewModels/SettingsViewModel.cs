@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +9,7 @@ using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI;
@@ -26,8 +29,13 @@ public enum SettingsSection
 }
 
 public sealed record SettingsSectionOption(SettingsSection Value, string Label, string Glyph)
+    : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public override string ToString() => DisplayLabel;
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
 }
 
 public sealed record AccentSwatch(string Name, string Hex);
@@ -50,6 +58,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private readonly ICapabilityRegistry _registry;
     private readonly IModelManager _models;
     private readonly IOcrModelManager _ocrModels;
+    private readonly IUpdateService _updates;
     private readonly IThumbnailService _thumbnails;
     private readonly INavigationService _navigation;
     private readonly IModelPanelService _modelPanel;
@@ -58,15 +67,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _saveCts;
     private Task? _diagnosticsTask;
     private DateTimeOffset _diagnosticsLoadedAt;
+    private SystemDiagnostics? _lastDiagnostics;
+    private string _appVersion = "";
     private bool _initialized;
     private bool _loading;
     private bool _syncingAccent;
     private bool _disposed;
 
+    public event EventHandler<UpdateCheckResult>? UpdateAvailable;
+
     public SettingsViewModel(ISettingsService settings, IThemeService theme, IAppPaths paths,
         IFilePickerService filePicker, IDialogService dialogs, INotificationService notifications,
         IHistoryRepository history, IDiagnosticsService diagnostics, ICapabilityRegistry registry,
-        IModelManager models, IOcrModelManager ocrModels, IThumbnailService thumbnails,
+        IModelManager models, IOcrModelManager ocrModels, IUpdateService updates, IThumbnailService thumbnails,
         INavigationService navigation, IModelPanelService modelPanel, IAppLogger logger)
     {
         _settings = settings;
@@ -80,6 +93,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _registry = registry;
         _models = models;
         _ocrModels = ocrModels;
+        _updates = updates;
         _thumbnails = thumbnails;
         _navigation = navigation;
         _modelPanel = modelPanel;
@@ -105,6 +119,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     }
 
     public IReadOnlyList<SettingsSectionOption> Sections { get; }
+    public IReadOnlyList<LanguageOption> LanguageOptions => LocalizationService.Languages;
     public ObservableCollection<string> AvailableFonts { get; } = [];
     public ObservableCollection<FormatItemViewModel> ImageFormats { get; } = [];
     public ObservableCollection<FormatItemViewModel> AudioFormats { get; } = [];
@@ -125,7 +140,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public ObservableCollection<UpscaleFormatChoice> UpscaleFormats { get; } = [];
     public ObservableCollection<Option<int>> VideoFrameRates { get; } =
     [
-        new(2, "2� (double)"), new(3, "3� (triple)"), new(4, "4� (quadruple)")
+        new(2, "2× (double)"), new(3, "3× (triple)"), new(4, "4× (quadruple)")
     ];
     public ObservableCollection<Option<ResamplingAlgorithm>> Algorithms { get; } =
     [
@@ -173,6 +188,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public IReadOnlyList<string> LogLevels { get; } = ["Debug", "Information", "Warning", "Error"];
 
     [ObservableProperty] private SettingsSectionOption _selectedSection;
+    [ObservableProperty] private LanguageOption? _selectedLanguage;
     [ObservableProperty] private Option<ThemeMode> _selectedTheme = new(ThemeMode.System, "Follow Windows");
     [ObservableProperty] private string _accentHex = "#D2693A";
     [ObservableProperty] private Color _accentColor = Color.FromArgb(255, 210, 105, 58);
@@ -193,6 +209,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private Option<ExecutionProviderKind> _selectedOcrProvider = new(ExecutionProviderKind.Auto, "Automatic (DirectML for PP-OCR, Vulkan for advanced OCR)");
     [ObservableProperty] private bool _ocrGeneratePdf;
     [ObservableProperty] private bool _ocrPreprocess = true;
+    [ObservableProperty] private bool _ocrReviewBeforeExport;
     [ObservableProperty] private string _ocrOutputDirectory = "";
     [ObservableProperty] private string _ocrProviderStatus = "";
     [ObservableProperty] private FormatItemViewModel? _selectedImageFormat;
@@ -251,19 +268,81 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _engineSummary = "";
     [ObservableProperty] private string _codecSummary = "";
     [ObservableProperty] private string _aboutVersion = "";
+    [ObservableProperty] private string _updateCurrentVersion = "";
+    [ObservableProperty] private string _updateStatus = "Check for updates manually, or enable automatic checks.";
+    [ObservableProperty] private bool _checkForUpdatesOnStartup;
+    [ObservableProperty] private bool _isUpdateChecking;
+    [ObservableProperty] private bool _isUpdateAvailable;
+    [ObservableProperty] private string _updateReleaseTitle = "";
+    [ObservableProperty] private string _updateReleaseNotes = "";
+    [ObservableProperty] private string? _updateReleaseUrl;
+    [ObservableProperty] private string? _updateDownloadUrl;
+    [ObservableProperty] private string? _updateDownloadLabel;
 
-    public bool IsGeneral => SelectedSection.Value == SettingsSection.General;
-    public bool IsConverter => SelectedSection.Value == SettingsSection.Converter;
-    public bool IsOcr => SelectedSection.Value == SettingsSection.Ocr;
-    public bool IsUpscaler => SelectedSection.Value == SettingsSection.Upscaler;
-    public bool IsProcessing => SelectedSection.Value == SettingsSection.Processing;
-    public bool IsStorage => SelectedSection.Value == SettingsSection.Storage;
-    public bool IsDiagnostics => SelectedSection.Value == SettingsSection.Diagnostics;
-    public bool IsAbout => SelectedSection.Value == SettingsSection.About;
+    public bool IsGeneral => SelectedSection?.Value == SettingsSection.General;
+    public bool IsConverter => SelectedSection?.Value == SettingsSection.Converter;
+    public bool IsOcr => SelectedSection?.Value == SettingsSection.Ocr;
+    public bool IsUpscaler => SelectedSection?.Value == SettingsSection.Upscaler;
+    public bool IsProcessing => SelectedSection?.Value == SettingsSection.Processing;
+    public bool IsStorage => SelectedSection?.Value == SettingsSection.Storage;
+    public bool IsDiagnostics => SelectedSection?.Value == SettingsSection.Diagnostics;
+    public bool IsAbout => SelectedSection?.Value == SettingsSection.About;
     public string FontPreview => "PixelForge — convert, transcode and upscale locally. 0123456789";
     public string LogsPath => _paths.LogsDirectory;
     public string NoticesPath => Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md");
     public string MonoPreview => "ffmpeg -crf 23 · h264_amf · ONNX Runtime";
+
+    /// <summary>
+    /// Refreshes localized display text without touching the Settings data or
+    /// replacing the DataContext. The option records raise their own change
+    /// notifications so bound ComboBoxes update in place.
+    /// </summary>
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var section in Sections) section.RefreshLocalization();
+        foreach (var format in ImageFormats) format.RefreshLocalization();
+        foreach (var format in AudioFormats) format.RefreshLocalization();
+        foreach (var format in VideoFormats) format.RefreshLocalization();
+        foreach (var option in ThemeOptions) option.RefreshLocalization();
+        foreach (var option in AudioBitrateOptions) option.RefreshLocalization();
+        foreach (var option in VideoPresets) option.RefreshLocalization();
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var option in OcrProviders) option.RefreshLocalization();
+        foreach (var option in ProviderKinds) option.RefreshLocalization();
+        foreach (var option in ScaleOptions) option.RefreshLocalization();
+        foreach (var option in VideoFrameRates) option.RefreshLocalization();
+        foreach (var option in Algorithms) option.RefreshLocalization();
+        foreach (var option in UpscaleMethods) option.RefreshLocalization();
+        foreach (var option in UpscaleFormats) option.RefreshLocalization();
+        foreach (var provider in Providers) provider.RefreshLocalization();
+        SelectedTheme.RefreshLocalization();
+        SelectedOcrProvider.RefreshLocalization();
+        SelectedAudioBitrate.RefreshLocalization();
+        SelectedVideoPreset.RefreshLocalization();
+        SelectedUpscaleMethod.RefreshLocalization();
+        if (SelectedUpscaleAlgorithm is { } algorithm) algorithm.RefreshLocalization();
+        if (SelectedProviderKind is { } providerKind) providerKind.RefreshLocalization();
+        if (SelectedUpscaleScale is { } upscaleScale) upscaleScale.RefreshLocalization();
+
+        UpdateOcrStatus();
+        UpdateModelStatus();
+        UpdateVideoModelStatus();
+
+        OnPropertyChanged(nameof(FontPreview));
+        OnPropertyChanged(nameof(MonoPreview));
+        OnPropertyChanged(nameof(SaveStatus));
+        OnPropertyChanged(nameof(UpdateStatus));
+        OnPropertyChanged(nameof(UpdateDownloadLabel));
+        OnPropertyChanged(nameof(OcrProviderStatus));
+        OnPropertyChanged(nameof(ModelStatusText));
+        OnPropertyChanged(nameof(VideoModelStatus));
+        OnPropertyChanged(nameof(VideoInterpolationStatus));
+        if (_lastDiagnostics is not null)
+            ApplyDiagnosticsStrings(_lastDiagnostics);
+        else if (!string.IsNullOrWhiteSpace(_appVersion))
+            AboutVersion = LocalizationService.F("Version {0}", _appVersion);
+    }
 
     public async Task InitializeAsync()
     {
@@ -281,7 +360,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
                 _loading = false;
             }
 
-            if (SelectedSection.Value == SettingsSection.Diagnostics &&
+            if (SelectedSection?.Value == SettingsSection.Diagnostics &&
                 (string.IsNullOrWhiteSpace(DiagnosticsReport) ||
                  DateTimeOffset.Now - _diagnosticsLoadedAt >= TimeSpan.FromMinutes(5)))
                 await RefreshDiagnosticsAsync();
@@ -303,8 +382,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             LoadModels();
             LoadOcrModels();
             LoadFromSettings();
-            AboutVersion = "Version " + (typeof(App).Assembly.GetName().Version?.ToString(3) ?? "1.0.0");
-            if (SelectedSection.Value == SettingsSection.Diagnostics)
+            _appVersion = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "2.0.0";
+            AboutVersion = LocalizationService.F("Version {0}", _appVersion);
+            UpdateCurrentVersion = _updates.CurrentVersion;
+            if (SelectedSection?.Value == SettingsSection.Diagnostics)
                 await RefreshDiagnosticsAsync();
         }
         catch (Exception ex)
@@ -320,6 +401,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private void LoadFromSettings()
     {
         var g = _settings.Settings.General;
+        SelectedLanguage = LanguageOptions.FirstOrDefault(l =>
+            string.Equals(l.Locale, LocalizationService.CurrentLocale, StringComparison.OrdinalIgnoreCase))
+            ?? LanguageOptions[0];
         SelectedTheme = ThemeOptions.FirstOrDefault(o => o.Value == g.Theme) ?? ThemeOptions[0];
         AccentHex = g.AccentColorHex;
         SelectedFont = _theme.AvailableFonts.Contains(g.FontFamily, StringComparer.OrdinalIgnoreCase) ? g.FontFamily : "Segoe UI Variable Text";
@@ -343,6 +427,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         SelectedOcrProvider = OcrProviders.FirstOrDefault(p => p.Value == o.ExecutionProvider) ?? OcrProviders[0];
         OcrGeneratePdf = o.GeneratePdf;
         OcrPreprocess = o.Preprocess;
+        OcrReviewBeforeExport = o.ReviewBeforeExport;
         OcrOutputDirectory = o.DefaultOutputDirectory;
         UpdateOcrStatus();
 
@@ -386,6 +471,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         HistoryRetentionDays = s.HistoryRetentionDays;
         MaxHistoryEntries = s.MaxHistoryEntries;
         SaveJobHistory = s.SaveJobHistory;
+
+        CheckForUpdatesOnStartup = _settings.Settings.Updates.CheckOnStartup;
     }
 
     private void LoadFormats()
@@ -465,56 +552,57 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         var directMl = _registry.ExecutionProviders.FirstOrDefault(p => p.Kind == ExecutionProviderKind.DirectML);
         var installed = SelectedOcrModel is null ? null : _ocrModels.GetInstalled(SelectedOcrModel.Id);
         var model = SelectedOcrModel is null
-            ? "No OCR model is available."
+            ? Loc.T("No OCR model is available.")
             : installed is { IsValid: true }
-                ? $"{SelectedOcrModel.Name} · installed · {SelectedOcrModel.DisplaySize}"
-                : $"{SelectedOcrModel.Name} · {SelectedOcrModel.DisplaySize} · download required";
+                ? Loc.F("{0} · installed · {1}", SelectedOcrModel.Name, SelectedOcrModel.DisplaySize)
+                : Loc.F("{0} · {1} · download required", SelectedOcrModel.Name, SelectedOcrModel.DisplaySize);
         var provider = SelectedOcrModel?.Backend == OcrBackendKind.LlamaCpp
             ? SelectedOcrProvider?.Value == ExecutionProviderKind.Cpu
-                ? "llama.cpp CPU"
-                : "llama.cpp Vulkan preferred · CPU fallback"
+                ? Loc.T("llama.cpp CPU")
+                : Loc.T("llama.cpp Vulkan preferred · CPU fallback")
             : SelectedOcrProvider?.Value switch
             {
-                ExecutionProviderKind.Cpu => "CPU only",
-                ExecutionProviderKind.Vulkan => "Vulkan requested · PP-OCRv6 falls back to CPU",
-                ExecutionProviderKind.DirectML when directMl?.IsAvailable == true => "DirectML requested",
-                ExecutionProviderKind.DirectML => "DirectML requested but unavailable; CPU fallback will be reported",
-                _ when directMl?.IsAvailable == true => "Automatic · DirectML preferred · CPU fallback",
-                _ => "Automatic · CPU fallback"
+                ExecutionProviderKind.Cpu => Loc.T("CPU only"),
+                ExecutionProviderKind.Vulkan => Loc.T("Vulkan requested · PP-OCRv6 falls back to CPU"),
+                ExecutionProviderKind.DirectML when directMl?.IsAvailable == true => Loc.T("DirectML requested"),
+                ExecutionProviderKind.DirectML => Loc.T("DirectML requested but unavailable; CPU fallback will be reported"),
+                _ when directMl?.IsAvailable == true => Loc.T("Automatic · DirectML preferred · CPU fallback"),
+                _ => Loc.T("Automatic · CPU fallback")
             };
-        OcrProviderStatus = $"{model} · {provider}";
+        OcrProviderStatus = Loc.F("{0} · {1}", model, provider);
     }
 
     private void UpdateVideoModelStatus()
     {
         var image = SelectedVideoModel is null ? null : _models.GetInstalled(SelectedVideoModel.Id);
         VideoModelStatus = SelectedVideoModel is null
-            ? "No image upscaling model is available for video."
+            ? Loc.T("No image upscaling model is available for video.")
             : image is { IsValid: true }
-                ? $"{SelectedVideoModel.Name} · installed"
-                : $"{SelectedVideoModel.Name} · download required before jobs can run";
+                ? Loc.F("{0} · installed", SelectedVideoModel.Name)
+                : Loc.F("{0} · download required before jobs can run", SelectedVideoModel.Name);
 
         var interpolation = SelectedVideoInterpolationModel is null
             ? null
             : _models.GetInstalled(SelectedVideoInterpolationModel.Id);
         VideoInterpolationStatus = SelectedVideoInterpolationModel is null
-            ? "No frame interpolation model is available."
+            ? Loc.T("No frame interpolation model is available.")
             : interpolation is { IsValid: true }
-                ? $"{SelectedVideoInterpolationModel.Name} · installed"
-                : $"{SelectedVideoInterpolationModel.Name} · download required before interpolation can run";
+                ? Loc.F("{0} · installed", SelectedVideoInterpolationModel.Name)
+                : Loc.F("{0} · download required before interpolation can run", SelectedVideoInterpolationModel.Name);
     }
 
     private void UpdateModelStatus()
     {
         if (SelectedUpscaleModel is null)
         {
-            ModelStatusText = "No models available";
+            ModelStatusText = Loc.T("No models available");
             return;
         }
         var installed = _models.GetInstalled(SelectedUpscaleModel.Id);
         ModelStatusText = installed is { IsValid: true }
-            ? $"{SelectedUpscaleModel.Name} · installed · {installed.ActualSizeBytes / 1024d / 1024:0.0} MB"
-            : $"{SelectedUpscaleModel.Name} · not installed";
+            ? Loc.F("{0} · installed · {1} MB", SelectedUpscaleModel.Name,
+                (installed.ActualSizeBytes / 1024d / 1024).ToString("0.0"))
+            : Loc.F("{0} · not installed", SelectedUpscaleModel.Name);
     }
 
     private void OnModelsChanged(object? sender, EventArgs e)
@@ -552,23 +640,89 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void ApplyDiagnosticsStrings(SystemDiagnostics diagnostics)
+    {
+        SystemSummary = LocalizationService.F(
+            "{0}\n{1} · {2} {3} · {4} {5}",
+            diagnostics.OperatingSystem, diagnostics.CpuName, diagnostics.LogicalCoreCount,
+            LocalizationService.T("logical cores"),
+            LocalizationService.FormatNumber(diagnostics.TotalMemoryBytes / 1024d / 1024 / 1024, "0.0"),
+            LocalizationService.T("GB RAM"));
+        var gpu = diagnostics.Gpus.FirstOrDefault();
+        if (gpu is not null)
+            SystemSummary += LocalizationService.F("\n{0} · driver {1}", gpu.Name, gpu.DriverVersion);
+        EngineSummary = string.Join("\n", diagnostics.Engines.Select(e =>
+            LocalizationService.F("{0}: {1} {2}", e.DisplayName,
+                LocalizationService.T(e.IsAvailable ? "Ready" : "Unavailable"),
+                e.Version is null ? "" : "· " + e.Version)));
+        CodecSummary = LocalizationService.T("Video codecs: ") + string.Join(", ", diagnostics.AvailableVideoCodecs) +
+                       "\n" + LocalizationService.T("Audio codecs: ") + string.Join(", ", diagnostics.AvailableAudioCodecs) +
+                       "\n" + LocalizationService.T("Image outputs: ") + string.Join(" ", diagnostics.AvailableImageFormats);
+        AboutVersion = diagnostics.AppVersion.StartsWith("Version ", StringComparison.OrdinalIgnoreCase)
+            ? diagnostics.AppVersion
+            : LocalizationService.F("Version {0}", diagnostics.AppVersion);
+        DiagnosticsReport = BuildLocalizedDiagnosticsReport(diagnostics);
+    }
+
+    private static string BuildLocalizedDiagnosticsReport(SystemDiagnostics d)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(LocalizationService.T("PixelForge diagnostics"));
+        sb.AppendLine("=====================");
+        sb.AppendLine($"{LocalizationService.T("App version")}:        {d.AppVersion}");
+        sb.AppendLine($"{LocalizationService.T("Operating system")}:   {d.OperatingSystem}");
+        sb.AppendLine($"{LocalizationService.T("Architecture")}:       {d.Architecture}");
+        sb.AppendLine($"{LocalizationService.T("CPU")}:                {d.CpuName} ({d.LogicalCoreCount} {LocalizationService.T("logical cores")})");
+        sb.AppendLine($"{LocalizationService.T("Memory")}:             {LocalizationService.FormatNumber(d.TotalMemoryBytes / 1024d / 1024 / 1024, "0.0")} {LocalizationService.T("GB RAM")}");
+        foreach (var gpu in d.Gpus)
+        {
+            var driver = string.IsNullOrWhiteSpace(gpu.DriverVersion) ? "" :
+                $" · {LocalizationService.T("driver")} {gpu.DriverVersion}";
+            sb.AppendLine($"{LocalizationService.T("GPU")}:                {gpu.Name}{driver} · {LocalizationService.FormatNumber((gpu.AdapterMemoryBytes ?? 0) / 1024d / 1024 / 1024, "0.0")} GB");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(LocalizationService.T("Engines"));
+        foreach (var e in d.Engines)
+        {
+            sb.AppendLine($"  {e.DisplayName} [{e.EngineId}] {e.Version} — {(e.IsAvailable ? LocalizationService.T("Ready") : LocalizationService.T("Unavailable"))}");
+            if (!string.IsNullOrWhiteSpace(e.Error))
+                sb.AppendLine($"    {LocalizationService.T("Error")}: {e.Error}");
+            foreach (var detail in e.Details) sb.AppendLine($"    {detail}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(LocalizationService.T("AI execution providers"));
+        foreach (var provider in d.ExecutionProviders)
+            sb.AppendLine($"  {provider.DisplayName} — {(provider.IsAvailable ? LocalizationService.T("Ready") : LocalizationService.T("Unavailable"))} {(provider.DeviceName is null ? "" : $"({provider.DeviceName})")}");
+
+        sb.AppendLine();
+        sb.AppendLine(LocalizationService.T("Installed models"));
+        if (d.InstalledModels.Count == 0) sb.AppendLine("  " + LocalizationService.T("None"));
+        foreach (var m in d.InstalledModels)
+            sb.AppendLine($"  {m.Descriptor.Name} {m.Descriptor.Version} — {(m.IsValid ? LocalizationService.T("Valid") : LocalizationService.T("Invalid"))} — {m.FilePath}");
+
+        sb.AppendLine();
+        sb.AppendLine($"{LocalizationService.T("Video codecs: ")}{string.Join(", ", d.AvailableVideoCodecs)}");
+        sb.AppendLine($"{LocalizationService.T("Audio codecs: ")}{string.Join(", ", d.AvailableAudioCodecs)}");
+        sb.AppendLine($"{LocalizationService.T("Image outputs: ")}{string.Join(" ", d.AvailableImageFormats)}");
+        sb.AppendLine();
+        sb.AppendLine($"{LocalizationService.T("Settings")}:  {d.SettingsPath}");
+        sb.AppendLine($"{LocalizationService.T("Database")}:  {d.DatabasePath}");
+        sb.AppendLine($"{LocalizationService.T("Logs")}:      {d.LogsPath}");
+        sb.AppendLine($"{LocalizationService.T("Models")}:    {d.ModelDirectory}");
+        sb.AppendLine($"{LocalizationService.T("Temp")}:      {d.TempDirectory}");
+        return sb.ToString();
+    }
+
     private async Task RefreshDiagnosticsCoreAsync()
     {
         IsDiagnosticsLoading = true;
         try
         {
             var diagnostics = await _diagnostics.BuildAsync();
-            DiagnosticsReport = await _diagnostics.BuildReportAsync(diagnostics);
-            SystemSummary = $"{diagnostics.OperatingSystem}\n{diagnostics.CpuName} · {diagnostics.LogicalCoreCount} logical cores · {diagnostics.TotalMemoryBytes / 1024d / 1024 / 1024:0.0} GB RAM";
-            var gpu = diagnostics.Gpus.FirstOrDefault();
-            if (gpu is not null) SystemSummary += $"\n{gpu.Name} · driver {gpu.DriverVersion}";
-            EngineSummary = string.Join("\n", diagnostics.Engines.Select(e =>
-                $"{e.DisplayName}: {(e.IsAvailable ? "Ready" : "Unavailable")} {(e.Version is null ? "" : "· " + e.Version)}"));
-            CodecSummary = "Video codecs: " + string.Join(", ", diagnostics.AvailableVideoCodecs) + "\nAudio codecs: " + string.Join(", ", diagnostics.AvailableAudioCodecs) +
-                           "\nImage outputs: " + string.Join(" ", diagnostics.AvailableImageFormats);
-            AboutVersion = diagnostics.AppVersion.StartsWith("Version ", StringComparison.OrdinalIgnoreCase)
-                ? diagnostics.AppVersion
-                : "Version " + diagnostics.AppVersion;
+            _lastDiagnostics = diagnostics;
+            ApplyDiagnosticsStrings(diagnostics);
             _diagnosticsLoadedAt = DateTimeOffset.Now;
         }
         catch (Exception ex)
@@ -778,11 +932,43 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         try
         {
-            if (Directory.Exists(TempDirectory))
+            var target = Path.GetFullPath(TempDirectory);
+            var appTemp = Path.GetFullPath(_paths.TempDirectory);
+            if (!string.Equals(target, appTemp, StringComparison.OrdinalIgnoreCase) &&
+                !target.StartsWith(appTemp + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var file in Directory.EnumerateFiles(TempDirectory, "*", SearchOption.AllDirectories))
+                await _dialogs.ShowErrorAsync("Cleanup refused",
+                    "For safety, temporary cleanup only runs inside PixelForge's own temp directory: " + appTemp);
+                return;
+            }
+            if (!await _dialogs.ConfirmAsync("Clean temporary files?",
+                    $"Delete files under:\n{target}\n\nActive jobs and OCR review files may be affected.",
+                    "Clean temp files", "Cancel", destructive: true))
+                return;
+
+            if (Directory.Exists(target))
+            {
+                if ((File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0)
                 {
-                    try { File.Delete(file); } catch { }
+                    await _dialogs.ShowErrorAsync("Cleanup refused",
+                        "The temporary directory is a symbolic link or junction. Remove it manually after checking its target.");
+                    return;
+                }
+
+                var cutoff = DateTime.UtcNow.AddMinutes(-5);
+                var options = new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System,
+                    IgnoreInaccessible = true
+                };
+                foreach (var file in Directory.EnumerateFiles(target, "*", options))
+                {
+                    try
+                    {
+                        if (File.GetLastWriteTimeUtc(file) < cutoff) File.Delete(file);
+                    }
+                    catch { }
                 }
             }
             await _dialogs.ShowMessageAsync("Temporary files cleaned", "Stale temporary files were removed where possible.");
@@ -790,6 +976,93 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             await _dialogs.ShowErrorAsync("Cleanup failed", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync() => await CheckForUpdatesCoreAsync(silent: false);
+
+    [RelayCommand]
+    private void OpenUpdateRelease()
+    {
+        var url = UpdateReleaseUrl;
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not open update release page: {Message}", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private void DownloadUpdate()
+    {
+        var url = UpdateDownloadUrl ?? UpdateReleaseUrl;
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not open update download: {Message}", ex.Message);
+        }
+    }
+
+    private async Task CheckForUpdatesCoreAsync(bool silent)
+    {
+        if (IsUpdateChecking || _disposed) return;
+        IsUpdateChecking = true;
+        try
+        {
+            UpdateStatus = "Checking GitHub releases…";
+            var result = await _updates.CheckAsync(includePreReleases: false);
+            UpdateStatus = result.Message ?? "The update service is unavailable.";
+
+            if (result.Outcome is not (UpdateCheckOutcome.UpdateAvailable or UpdateCheckOutcome.PreReleaseAvailable) ||
+                result.Release is null)
+            {
+                IsUpdateAvailable = false;
+                return;
+            }
+
+            var release = result.Release;
+            IsUpdateAvailable = true;
+            UpdateReleaseTitle = release.Name;
+            UpdateReleaseNotes = release.Body;
+            UpdateReleaseUrl = release.HtmlUrl;
+            var asset = release.Assets.FirstOrDefault(a => a.IsInstaller)
+                        ?? release.Assets.FirstOrDefault(a => a.IsPortable);
+            UpdateDownloadUrl = asset?.DownloadUrl;
+            UpdateDownloadLabel = asset is null ? "Open release page" : $"Download {release.Version}";
+
+            var alreadyNotified = string.Equals(_settings.Settings.Updates.LastNotifiedVersion,
+                release.Version, StringComparison.OrdinalIgnoreCase);
+            if (!silent || !alreadyNotified)
+            {
+                await _settings.UpdateAsync(s => s.Updates.LastNotifiedVersion = release.Version);
+                UpdateAvailable?.Invoke(this, result);
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus = "The update service is unavailable. Check your connection and try again.";
+            _logger.LogWarning("Update check failed: {Message}", ex.Message);
+        }
+        finally
+        {
+            IsUpdateChecking = false;
         }
     }
 
@@ -853,6 +1126,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private void ApplyGeneral()
     {
         var g = _settings.Settings.General;
+        g.Language = SelectedLanguage?.Locale ?? LocalizationService.CurrentLocale;
         g.Theme = SelectedTheme?.Value ?? ThemeMode.System;
         if (IsValidHex(AccentHex)) g.AccentColorHex = AccentHex;
         g.FontFamily = SelectedFont;
@@ -904,6 +1178,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         o.ExecutionProvider = SelectedOcrProvider?.Value ?? ExecutionProviderKind.Auto;
         o.GeneratePdf = OcrGeneratePdf;
         o.Preprocess = OcrPreprocess;
+        o.ReviewBeforeExport = OcrReviewBeforeExport;
         o.DefaultOutputDirectory = OcrOutputDirectory;
     }
 
@@ -946,7 +1221,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         ApplyUpscaler();
         ApplyVideoDefaults();
         ApplyProcessing();
+        ApplyUpdates();
         ScheduleSave();
+    }
+
+    private void ApplyUpdates()
+    {
+        _settings.Settings.Updates.CheckOnStartup = CheckForUpdatesOnStartup;
     }
 
     private static bool IsValidHex(string value)
@@ -1052,6 +1333,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedSectionChanged(SettingsSectionOption value)
     {
+        if (value is null) return;
         OnPropertyChanged(nameof(IsGeneral));
         OnPropertyChanged(nameof(IsConverter));
         OnPropertyChanged(nameof(IsOcr));
@@ -1068,8 +1350,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     partial void OnSelectedOcrProviderChanged(Option<ExecutionProviderKind> value) => UpdateOcrStatus();
     partial void OnOcrGeneratePdfChanged(bool value) => ApplyAndSave();
     partial void OnOcrPreprocessChanged(bool value) => ApplyAndSave();
+    partial void OnOcrReviewBeforeExportChanged(bool value) => ApplyAndSave();
     partial void OnOcrOutputDirectoryChanged(string value) => ApplyAndSave();
 
+    partial void OnCheckForUpdatesOnStartupChanged(bool value) => ApplyAndSave();
+    partial void OnSelectedLanguageChanged(LanguageOption? value)
+    {
+        if (_loading || value is null) return;
+        if (string.Equals(value.Locale, LocalizationService.CurrentLocale, StringComparison.OrdinalIgnoreCase))
+            return;
+        if (!LocalizationService.SetLanguage(value.Locale)) return;
+        ApplyAndSave();
+        SaveStatus = "Language applied";
+    }
     partial void OnSelectedThemeChanged(Option<ThemeMode> value) => ApplyAndSave();
     partial void OnAccentHexChanged(string value)
     {

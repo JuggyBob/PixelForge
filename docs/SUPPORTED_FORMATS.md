@@ -1,6 +1,6 @@
 # Supported Formats and Capabilities
 
-This document describes the formats verified with the PixelForge 1.0.0 engines on the reference Windows 11 system. The converter only lists a target format when the installed engine reports that it can actually write it.
+This document describes the formats verified with the PixelForge 2.0.0 engines on the reference Windows 11 system. The converter only lists a target format when the installed engine reports that it can actually write it.
 
 ## Images
 
@@ -95,9 +95,9 @@ The following matrix is produced from the actual capability probe of the bundled
 | VP8 | `libvpx` | — |
 | MPEG-4 Part 2 | `mpeg4` | — |
 | Apple ProRes | `prores_ks` | — |
+| Animated GIF | `gif` | — |
 
 ProRes quality is selected with a profile preset (`proxy`, `lt`, `standard`, `hq`, `4444`, `4444xq`) rather than bitrate or CRF.
-| Animated GIF | `gif` | — |
 
 Hardware encoders are exposed only when a short real encode probe succeeds. On other systems, available hardware encoders depend on the GPU, driver, and FFmpeg build support. DirectML is used for AI upscaling and u2netp background removal independently of the FFmpeg video encoder path.
 

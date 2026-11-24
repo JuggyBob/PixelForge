@@ -62,6 +62,16 @@ Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\temp"
 
 [Code]
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+  if RegValueExists(HKCU, 'Software\PixelForge\Msi', 'StartMenu') then
+  begin
+    MsgBox('Uninstall the MSI PixelForge build before installing this EXE.', mbError, MB_OK);
+    Result := False;
+  end;
+end;
+
 procedure InitializeWizard();
 begin
   WizardForm.WelcomeLabel2.Caption :=

@@ -1,6 +1,7 @@
 using Microsoft.UI.Dispatching;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Services;
 
@@ -12,8 +13,12 @@ public enum NotificationSeverity
     Error
 }
 
-public sealed record AppNotification(Guid Id, string Title, string Message, NotificationSeverity Severity,
-    DateTimeOffset CreatedAt, bool AutoDismiss = true);
+public sealed record AppNotification(Guid Id, string TitleSource, string MessageSource,
+    NotificationSeverity Severity, DateTimeOffset CreatedAt, bool AutoDismiss = true)
+{
+    public string Title => LocalizationService.T(TitleSource);
+    public string Message => LocalizationService.T(MessageSource);
+}
 
 public interface INotificationService
 {

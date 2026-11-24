@@ -13,8 +13,10 @@ using Microsoft.UI.Xaml.Media.Animation;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Presentation.Controls;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using PixelForge.Presentation.ViewModels;
+using Windows.Foundation;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -31,6 +33,7 @@ public sealed partial class ShellPage : Page
     private readonly ISettingsService _settings;
     private readonly INotificationService _notifications;
     private readonly IModelPanelService _modelPanel;
+    private readonly IDownloadActivityService _downloads;
     private readonly IAppLogger _logger;
     private readonly DispatcherQueue _dispatcher;
     private readonly ObservableCollection<NotificationHistoryItem> _notificationHistory = [];
@@ -40,6 +43,8 @@ public sealed partial class ShellPage : Page
     private bool _activeNotificationUpdateQueued;
     private bool _syncingSelection;
     private bool _initialized;
+    private bool _eventsSubscribed;
+    private string[]? _pendingShellActivation;
     private Storyboard? _compactPulse;
     private Storyboard? _indicatorStoryboard;
     private Storyboard? _statusCardStoryboard;
@@ -50,16 +55,23 @@ public sealed partial class ShellPage : Page
     private bool _resizingPane;
     private bool _indicatorUpdateQueued;
     private bool _indicatorAnimateRequested;
+    private readonly List<OnboardingStep> _onboardingSteps = [];
+    private int _onboardingIndex;
+    private bool _onboardingActive;
+    private Storyboard? _onboardingStoryboard;
     private const double MinSidebarWidth = 240;
     private const double MaxSidebarWidth = 400;
+    private const double OnboardingCardWidth = 400;
 
     public ShellPage(INavigationService navigation, IThemeService theme, MotionService motion,
         IJobService jobs, ICapabilityRegistry registry, ISettingsService settings,
-        INotificationService notifications, IModelPanelService modelPanel, IAppLogger logger)
+        INotificationService notifications, IModelPanelService modelPanel,
+        IDownloadActivityService downloads, IAppLogger logger)
     {
         InitializeComponent();
         NotificationHistoryList.ItemsSource = _notificationHistory;
         ActiveNotificationList.ItemsSource = _activeNotifications;
+        DownloadActivityList.ItemsSource = downloads.Items;
         UpdateNotificationHistoryState();
         _navigation = navigation;
         _theme = theme;
@@ -69,32 +81,67 @@ public sealed partial class ShellPage : Page
         _settings = settings;
         _notifications = notifications;
         _modelPanel = modelPanel;
+        _downloads = downloads;
         _logger = logger;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
 
+        _onboardingSteps.AddRange([
+            new OnboardingStep(HomeNav, OnboardingAnchor.Right, "Welcome to PixelForge",
+                "Your local media studio. Convert, restore, upscale, and OCR files without uploading anything."),
+            new OnboardingStep(ConverterNav, OnboardingAnchor.Right, "Convert almost anything",
+                "Stage images, audio, video, documents, e-books, and archives. Choose a target format, destination, and collision policy."),
+            new OnboardingStep(ToolsNav, OnboardingAnchor.Right, "Focused media tools",
+                "Trim, compress, normalise, remove backgrounds, edit metadata, and fix video without leaving the app."),
+            new OnboardingStep(OcrNav, OnboardingAnchor.Right, "Turn scans into documents",
+                "Order pages, review recognised text, and export a single DOCX with an optional PDF companion."),
+            new OnboardingStep(UpscalerNav, OnboardingAnchor.Right, "Restore and upscale images",
+                "Use traditional resampling or AI models, with provider and compatibility details shown before you queue."),
+            new OnboardingStep(VideoUpscalerNav, OnboardingAnchor.Right, "Sharpen video frame by frame",
+                "Combine AI super-resolution with RIFE interpolation and temporal stability while preserving audio."),
+            new OnboardingStep(WatchNav, OnboardingAnchor.Right, "Let folders run themselves",
+                "Watch a folder and queue new files automatically with the same validated settings as the main tools."),
+            new OnboardingStep(QueueNav, OnboardingAnchor.Right, "One verified queue",
+                "Every job runs locally through the queue. History keeps the settings, providers, verification, and reports."),
+            new OnboardingStep(NotificationCenterButton, OnboardingAnchor.Below, "Stay in the loop",
+                "The bell collects job results and download activity. Live progress and Pause/Resume controls stay here."),
+            new OnboardingStep(SettingsNav, OnboardingAnchor.Right, "Make it yours",
+                "Set defaults, model folders, OCR and upscaling behaviour, appearance, diagnostics, and update checks.")
+        ]);
+        ShellRoot.SizeChanged += (_, _) => { if (_onboardingActive) PositionOnboardingStep(); };
+
         _navigation.Initialize(ContentFrame);
         _navigation.Navigated += OnNavigated;
+        SubscribeShellEvents();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
+
+    private void SubscribeShellEvents()
+    {
+        if (_eventsSubscribed) return;
+        _eventsSubscribed = true;
         _jobs.JobChanged += OnJobChanged;
         _jobs.QueueChanged += OnQueueChanged;
         _registry.CapabilitiesChanged += OnCapabilitiesChanged;
         _theme.ThemeApplied += OnThemeApplied;
         _notifications.NotificationRaised += OnNotification;
+        _downloads.Changed += OnDownloadsChanged;
         _modelPanel.OpenRequested += OnModelPanelRequested;
         _modelPanel.CloseRequested += OnModelPanelCloseRequested;
+        LocalizationService.LanguageChanged += OnLanguageChanged;
         Nav.PaneOpening += OnPaneOpening;
         Nav.PaneClosing += OnPaneClosing;
         Nav.PaneOpened += OnPaneStateChanged;
         Nav.PaneClosed += OnPaneStateChanged;
         Nav.DisplayModeChanged += OnDisplayModeChanged;
         Nav.SizeChanged += OnNavSizeChanged;
-        Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
     }
 
     public Grid TitleBarDragRegion => TitleBarDragArea;
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        SubscribeShellEvents();
         if (_initialized) return;
         _initialized = true;
         AddKeyboardAccelerators();
@@ -103,7 +150,7 @@ public sealed partial class ShellPage : Page
         Controls.SidebarResizeCursor.Apply(PaneResizeHandle);
         UpdatePaneResizeHandle();
         var last = _settings.Settings.General.RememberLastPage ? _settings.Settings.General.LastPage : "Home";
-        if (last is not ("Home" or "Converter" or "Tools" or "Upscaler" or "Ocr" or "VideoUpscaler" or "Watch" or "Queue" or "History" or "Settings"))
+        if (last is not ("Home" or "Converter" or "Pipelines" or "Tools" or "Upscaler" or "Ocr" or "VideoUpscaler" or "Watch" or "Queue" or "History" or "Settings"))
             last = "Home";
         NavigateAndSelect(last);
         UpdateStatusCardLayout(animate: false);
@@ -111,6 +158,10 @@ public sealed partial class ShellPage : Page
         UpdateActiveNotifications();
         QueueIndicatorUpdate(animate: false);
         _logger.LogInformation($"Startup: shell ready at {App.StartupClock.Elapsed.TotalMilliseconds:0.0} ms");
+        var pending = _pendingShellActivation;
+        _pendingShellActivation = null;
+        if (pending is not null) _ = HandleShellActivationAsync(pending);
+        if (!_settings.Settings.General.OnboardingCompleted) _ = StartOnboardingAsync();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -120,14 +171,17 @@ public sealed partial class ShellPage : Page
         _registry.CapabilitiesChanged -= OnCapabilitiesChanged;
         _theme.ThemeApplied -= OnThemeApplied;
         _notifications.NotificationRaised -= OnNotification;
+        _downloads.Changed -= OnDownloadsChanged;
         _modelPanel.OpenRequested -= OnModelPanelRequested;
         _modelPanel.CloseRequested -= OnModelPanelCloseRequested;
+        LocalizationService.LanguageChanged -= OnLanguageChanged;
         Nav.PaneOpening -= OnPaneOpening;
         Nav.PaneClosing -= OnPaneClosing;
         Nav.PaneOpened -= OnPaneStateChanged;
         Nav.PaneClosed -= OnPaneStateChanged;
         Nav.DisplayModeChanged -= OnDisplayModeChanged;
         Nav.SizeChanged -= OnNavSizeChanged;
+        _eventsSubscribed = false;
     }
 
     private void OnPaneOpening(NavigationView sender, object args)
@@ -405,6 +459,7 @@ public sealed partial class ShellPage : Page
     {
         AddAccelerator(VirtualKey.Number1, "Home");
         AddAccelerator(VirtualKey.Number2, "Converter");
+        AddAccelerator(VirtualKey.P, "Pipelines", VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift);
         AddAccelerator(VirtualKey.Number3, "Upscaler");
         AddAccelerator(VirtualKey.Number4, "Queue");
         AddAccelerator(VirtualKey.Number5, "History");
@@ -438,6 +493,7 @@ public sealed partial class ShellPage : Page
         {
             "Home" => HomeNav,
             "Converter" => ConverterNav,
+            "Pipelines" => PipelinesNav,
             "Tools" => ToolsNav,
             "Watch" => WatchNav,
             "Upscaler" => UpscalerNav,
@@ -466,6 +522,94 @@ public sealed partial class ShellPage : Page
         }
     }
 
+    private async Task<T?> WaitForPageAsync<T>(string route) where T : Page
+    {
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            if (ContentFrame.Content is T page) return page;
+            await Task.Delay(100);
+            if (ContentFrame.Content is null && attempt == 5) NavigateAndSelect(route);
+        }
+        return ContentFrame.Content as T;
+    }
+
+    public async Task HandleShellActivationAsync(string[] args)
+    {
+        if (!IsLoaded)
+        {
+            _pendingShellActivation = args;
+            return;
+        }
+        var offset = args.Length > 0 && string.Equals(args[0], "--shell", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        if (args.Length <= offset + 1) return;
+        var verb = args[offset].TrimStart('-').ToLowerInvariant();
+        var paths = args.Skip(offset + 1)
+            .Where(p => File.Exists(p) || Directory.Exists(p))
+            .Select(Path.GetFullPath)
+            .ToList();
+        if (paths.Count == 0) return;
+
+        App.MainWindow?.Activate();
+        switch (verb)
+        {
+            case "convert-images":
+            case "convert-audio":
+            case "convert-video":
+            case "convert-documents":
+            case "convert-ebooks":
+            case "convert-archives":
+            {
+                var category = verb switch
+                {
+                    "convert-audio" => MediaCategory.Audio,
+                    "convert-video" => MediaCategory.Video,
+                    "convert-documents" => MediaCategory.Document,
+                    "convert-ebooks" => MediaCategory.Ebook,
+                    "convert-archives" => MediaCategory.Archive,
+                    _ => MediaCategory.Image
+                };
+                NavigateAndSelect("Converter");
+                var converter = await WaitForPageAsync<ConverterPage>("Converter");
+                if (converter is not null)
+                    await converter.ViewModel.AddFilesAsync(paths, category);
+                break;
+            }
+            case "scan-images-folder":
+            case "convert-images-folder":
+            {
+                NavigateAndSelect("Converter");
+                var converter = await WaitForPageAsync<ConverterPage>("Converter");
+                if (converter is not null && Directory.Exists(paths[0]))
+                    await converter.ViewModel.AddFolderAsCategoryAsync(paths[0], MediaCategory.Image);
+                break;
+            }
+            case "upscale-image":
+            {
+                NavigateAndSelect("Upscaler");
+                var upscaler = await WaitForPageAsync<UpscalerPage>("Upscaler");
+                if (upscaler is not null)
+                    await upscaler.ViewModel.AddImagesAsync(paths);
+                break;
+            }
+            case "upscale-video":
+            {
+                NavigateAndSelect("VideoUpscaler");
+                var video = await WaitForPageAsync<VideoUpscalerPage>("VideoUpscaler");
+                if (video is not null)
+                    await video.ViewModel.AddVideosAsync(paths);
+                break;
+            }
+            case "ocr":
+            {
+                NavigateAndSelect("Ocr");
+                var ocr = await WaitForPageAsync<OcrPage>("Ocr");
+                if (ocr is not null)
+                    await ocr.ViewModel.AddPathsAsync(paths, allowDuplicates: false);
+                break;
+            }
+        }
+    }
+
     private void OnNavigated(object? sender, string route)
     {
         _settings.Settings.General.LastPage = route;
@@ -473,6 +617,7 @@ public sealed partial class ShellPage : Page
         {
             "Home" => HomeNav,
             "Converter" => ConverterNav,
+            "Pipelines" => PipelinesNav,
             "Tools" => ToolsNav,
             "Watch" => WatchNav,
             "Upscaler" => UpscalerNav,
@@ -555,13 +700,15 @@ public sealed partial class ShellPage : Page
                 var progress = active.Average(j => j.Progress) * 100;
                 var running = active.Count(j => j.State == JobState.Running);
                 ApplyStatus(
-                    active.Count == 1 ? "1 job active" : $"{active.Count} jobs active",
-                    running > 0 ? $"{progress:0}% · processing locally" : "Preparing files…",
+                    LocalizationService.P("Status.JobsActive", active.Count),
+                    running > 0
+                        ? LocalizationService.P("Status.ProcessingLocally", (int)Math.Round(progress))
+                        : LocalizationService.T("Preparing files."),
                     "AccentPrimaryBrush",
                     true,
                     progress,
                     running == 0,
-                    active.Count == 1 ? "1 job" : $"{active.Count} jobs");
+                    LocalizationService.P("Status.JobsCompact", active.Count));
                 return;
             }
 
@@ -575,7 +722,8 @@ public sealed partial class ShellPage : Page
             var unavailable = _registry.Engines.Where(e => !e.IsAvailable).ToList();
             if (unavailable.Count > 0)
             {
-                ApplyStatus("Engine attention needed", unavailable[0].DisplayName + " unavailable", "DangerBrush",
+                ApplyStatus("Engine attention needed",
+                    LocalizationService.F("{0} unavailable", unavailable[0].DisplayName), "DangerBrush",
                     false, 0, false, "Issue");
                 return;
             }
@@ -592,19 +740,24 @@ public sealed partial class ShellPage : Page
         double progress, bool indeterminate, string compactLabel)
     {
         var brush = GetThemeBrush(brushKey);
-        StatusTitle.Text = title;
-        StatusDetail.Text = detail;
+        var localizedTitle = LocalizationService.T(title);
+        var localizedDetail = LocalizationService.T(detail);
+        var localizedCompact = LocalizationService.T(compactLabel);
+        StatusTitle.Text = localizedTitle;
+        StatusDetail.Text = localizedDetail;
         StatusDot.Fill = brush;
         StatusDotCompact.Fill = brush;
         StatusProgress.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         StatusProgress.IsIndeterminate = indeterminate;
         StatusProgress.Value = progress;
         StatusDotCompact.Visibility = Visibility.Visible;
-        CompactStatusLabel.Text = compactLabel;
+        CompactStatusLabel.Text = localizedCompact;
         CompactStatusLabel.Foreground = brush;
         SetCompactPulse(active);
-        ToolTipService.SetToolTip(QueueStatusCard, $"{title} — {detail}");
-        AutomationProperties.SetName(QueueStatusCard, $"{title}. {detail}");
+        ToolTipService.SetToolTip(QueueStatusCard,
+            LocalizationService.F("{0} — {1}", localizedTitle, localizedDetail));
+        AutomationProperties.SetName(QueueStatusCard,
+            LocalizationService.F("{0}. {1}", localizedTitle, localizedDetail));
     }
 
     private void SetCompactPulse(bool active)
@@ -676,7 +829,8 @@ public sealed partial class ShellPage : Page
             Severity = severity,
             IsOpen = true,
             IsClosable = true,
-            Width = 380
+            Width = 380,
+            Tag = notification
         };
         if (_motion.IsEnabled)
         {
@@ -720,6 +874,34 @@ public sealed partial class ShellPage : Page
         else
             _unreadNotifications++;
         UpdateNotificationBadge();
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        if (!_dispatcher.HasThreadAccess)
+        {
+            _dispatcher.TryEnqueue(() => OnLanguageChanged(sender, e));
+            return;
+        }
+
+        LocalizationPageRegistry.RefreshAll();
+        RebuildNotificationHistory();
+        RefreshActiveNotificationBars();
+        UpdateActiveNotifications();
+        if (_onboardingActive) ShowOnboardingStep();
+        UpdateStatus();
+    }
+
+    private void RefreshActiveNotificationBars()
+    {
+        foreach (var child in NotificationStack.Children)
+        {
+            if (child is InfoBar { Tag: AppNotification notification } bar)
+            {
+                bar.Title = notification.Title;
+                bar.Message = notification.Message;
+            }
+        }
     }
 
     private void RebuildNotificationHistory()
@@ -804,18 +986,26 @@ public sealed partial class ShellPage : Page
             {
                 var item = _activeNotifications.FirstOrDefault(n => n.JobId == job.Id);
                 if (item is null)
-                    _activeNotifications.Add(new ActiveJobNotificationItem(job));
+                    _activeNotifications.Add(new ActiveJobNotificationItem(job, id => _jobs.CancelAsync(id)));
                 else
                     item.Update(job);
             }
 
             ActiveNotificationsSection.Visibility =
-                _activeNotifications.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                _activeNotifications.Count > 0 || _downloads.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            DownloadActivitySection.Visibility =
+                _downloads.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception ex)
         {
             _logger.LogWarning("Active notification update failed: {Message}", ex.Message);
         }
+    }
+
+    private void OnDownloadsChanged(object? sender, EventArgs e)
+    {
+        if (_dispatcher.HasThreadAccess) UpdateActiveNotifications();
+        else _dispatcher.TryEnqueue(UpdateActiveNotifications);
     }
 
     private void UpdateNotificationBadge()
@@ -855,6 +1045,262 @@ public sealed partial class ShellPage : Page
         RebuildNotificationHistory();
         UpdateNotificationBadge();
     }
+
+    private async Task StartOnboardingAsync()
+    {
+        try
+        {
+            await Task.Delay(700);
+            if (!IsLoaded || _onboardingActive || _settings.Settings.General.OnboardingCompleted) return;
+            if (ContentFrame.Content is null) await Task.Delay(350);
+            if (!IsLoaded || _onboardingActive) return;
+
+            _onboardingActive = true;
+            _onboardingIndex = 0;
+            NotificationStack.Visibility = Visibility.Collapsed;
+            OnboardingOverlay.Visibility = Visibility.Visible;
+            ShowOnboardingStep();
+            OnboardingNext.Focus(FocusState.Programmatic);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Onboarding could not start: {Message}", ex.Message);
+        }
+    }
+
+    private void ShowOnboardingStep()
+    {
+        if (!_onboardingActive || _onboardingSteps.Count == 0) return;
+        _onboardingIndex = Math.Clamp(_onboardingIndex, 0, _onboardingSteps.Count - 1);
+        var step = _onboardingSteps[_onboardingIndex];
+        OnboardingStepLabel.Text = LocalizationService.F("{0} of {1}",
+            _onboardingIndex + 1, _onboardingSteps.Count);
+        OnboardingTitle.Text = LocalizationService.T(step.Title);
+        OnboardingBody.Text = LocalizationService.T(step.Body);
+        OnboardingBack.IsEnabled = _onboardingIndex > 0;
+        OnboardingNext.Content = LocalizationService.T(
+            _onboardingIndex == _onboardingSteps.Count - 1 ? "Finish" : "Next");
+        OnboardingCard.Measure(new Size(OnboardingCardWidth, double.PositiveInfinity));
+        PositionOnboardingStep();
+        AnimateOnboardingStep();
+    }
+
+    private void PositionOnboardingStep()
+    {
+        if (!_onboardingActive || _onboardingSteps.Count == 0) return;
+        var step = _onboardingSteps[_onboardingIndex];
+        var target = step.Target;
+        var rootWidth = Math.Max(ShellRoot.ActualWidth, 640);
+        var rootHeight = Math.Max(ShellRoot.ActualHeight, 480);
+        var cardHeight = Math.Max(170, OnboardingCard.DesiredSize.Height);
+        var targetPoint = target.TransformToVisual(ShellRoot).TransformPoint(new Point(0, 0));
+        var targetWidth = Math.Max(target.ActualWidth, 180);
+        var targetHeight = Math.Max(target.ActualHeight, 36);
+
+        double x;
+        double y;
+        switch (step.Anchor)
+        {
+            case OnboardingAnchor.Below:
+                x = targetPoint.X + targetWidth / 2 - OnboardingCardWidth / 2;
+                y = targetPoint.Y + targetHeight + 24;
+                break;
+            case OnboardingAnchor.Left:
+                x = targetPoint.X - OnboardingCardWidth - 24;
+                y = targetPoint.Y + targetHeight / 2 - cardHeight / 2;
+                break;
+            case OnboardingAnchor.Above:
+                x = targetPoint.X + targetWidth / 2 - OnboardingCardWidth / 2;
+                y = targetPoint.Y - cardHeight - 24;
+                break;
+            default:
+                x = targetPoint.X + targetWidth + 24;
+                y = targetPoint.Y + targetHeight / 2 - cardHeight / 2;
+                break;
+        }
+
+        x = Math.Clamp(x, 16, Math.Max(16, rootWidth - OnboardingCardWidth - 16));
+        y = Math.Clamp(y, 56, Math.Max(56, rootHeight - cardHeight - 16));
+        OnboardingCard.Margin = new Thickness(x, y, 0, 0);
+        OnboardingCardTransform.CenterX = OnboardingCardWidth / 2;
+        OnboardingCardTransform.CenterY = cardHeight / 2;
+
+        OnboardingSpotlight.Margin = new Thickness(targetPoint.X - 7, targetPoint.Y - 7, 0, 0);
+        OnboardingSpotlight.Width = targetWidth + 14;
+        OnboardingSpotlight.Height = targetHeight + 14;
+        OnboardingSpotlight.Visibility = Visibility.Visible;
+
+        double arrowX;
+        double arrowY;
+        double arrowAngle;
+        switch (step.Anchor)
+        {
+            case OnboardingAnchor.Below:
+                arrowX = targetPoint.X + targetWidth / 2 - 10;
+                arrowY = targetPoint.Y + targetHeight + 7;
+                arrowAngle = 270;
+                break;
+            case OnboardingAnchor.Left:
+                arrowX = targetPoint.X - 27;
+                arrowY = targetPoint.Y + targetHeight / 2 - 10;
+                arrowAngle = 0;
+                break;
+            case OnboardingAnchor.Above:
+                arrowX = targetPoint.X + targetWidth / 2 - 10;
+                arrowY = targetPoint.Y - 27;
+                arrowAngle = 90;
+                break;
+            default:
+                arrowX = targetPoint.X + targetWidth + 7;
+                arrowY = targetPoint.Y + targetHeight / 2 - 10;
+                arrowAngle = 180;
+                break;
+        }
+
+        OnboardingArrow.Margin = new Thickness(arrowX, arrowY, 0, 0);
+        OnboardingArrowRotation.Angle = arrowAngle;
+        OnboardingArrow.Visibility = Visibility.Visible;
+    }
+
+    private void AnimateOnboardingStep()
+    {
+        _onboardingStoryboard?.Stop();
+        _onboardingStoryboard = null;
+        OnboardingCardTransform.ScaleX = 1;
+        OnboardingCardTransform.ScaleY = 1;
+        OnboardingCard.Opacity = 1;
+        OnboardingSpotlight.Opacity = 1;
+
+        if (!_motion.IsEnabled)
+        {
+            OnboardingArrow.Opacity = 1;
+            return;
+        }
+
+        OnboardingCard.Opacity = 0;
+        OnboardingCardTransform.ScaleX = 0.92;
+        OnboardingCardTransform.ScaleY = 0.92;
+        OnboardingArrow.Opacity = 0;
+        OnboardingSpotlight.Opacity = 0.45;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var pop = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 };
+        var opacity = new DoubleAnimation
+        {
+            From = 0, To = 1, Duration = TimeSpan.FromMilliseconds(160), EasingFunction = ease
+        };
+        var scaleX = new DoubleAnimation
+        {
+            From = 0.92, To = 1, Duration = TimeSpan.FromMilliseconds(240), EasingFunction = pop
+        };
+        var scaleY = new DoubleAnimation
+        {
+            From = 0.92, To = 1, Duration = TimeSpan.FromMilliseconds(240), EasingFunction = pop
+        };
+        var arrowOpacity = new DoubleAnimation
+        {
+            From = 0, To = 1, Duration = TimeSpan.FromMilliseconds(220), EasingFunction = ease
+        };
+        var spotlightOpacity = new DoubleAnimation
+        {
+            From = 0.45, To = 1, Duration = TimeSpan.FromMilliseconds(700),
+            AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease
+        };
+
+        Storyboard.SetTarget(opacity, OnboardingCard);
+        Storyboard.SetTargetProperty(opacity, "Opacity");
+        Storyboard.SetTarget(scaleX, OnboardingCardTransform);
+        Storyboard.SetTargetProperty(scaleX, "ScaleX");
+        Storyboard.SetTarget(scaleY, OnboardingCardTransform);
+        Storyboard.SetTargetProperty(scaleY, "ScaleY");
+        Storyboard.SetTarget(arrowOpacity, OnboardingArrow);
+        Storyboard.SetTargetProperty(arrowOpacity, "Opacity");
+        Storyboard.SetTarget(spotlightOpacity, OnboardingSpotlight);
+        Storyboard.SetTargetProperty(spotlightOpacity, "Opacity");
+
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(opacity);
+        storyboard.Children.Add(scaleX);
+        storyboard.Children.Add(scaleY);
+        storyboard.Children.Add(arrowOpacity);
+        storyboard.Children.Add(spotlightOpacity);
+        storyboard.Begin();
+        _onboardingStoryboard = storyboard;
+    }
+
+    private void OnOnboardingNextClick(object sender, RoutedEventArgs e)
+    {
+        if (_onboardingIndex >= _onboardingSteps.Count - 1)
+        {
+            _ = CompleteOnboardingAsync();
+            return;
+        }
+
+        _onboardingIndex++;
+        ShowOnboardingStep();
+    }
+
+    private void OnOnboardingBackClick(object sender, RoutedEventArgs e)
+    {
+        if (_onboardingIndex <= 0) return;
+        _onboardingIndex--;
+        ShowOnboardingStep();
+    }
+
+    private void OnOnboardingSkipClick(object sender, RoutedEventArgs e) => _ = CompleteOnboardingAsync();
+
+    private void OnOnboardingKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (!_onboardingActive) return;
+        if (e.Key == VirtualKey.Escape)
+        {
+            e.Handled = true;
+            _ = CompleteOnboardingAsync();
+        }
+        else if (e.Key is VirtualKey.Right or VirtualKey.Enter)
+        {
+            e.Handled = true;
+            OnOnboardingNextClick(sender, new RoutedEventArgs());
+        }
+        else if (e.Key == VirtualKey.Left && _onboardingIndex > 0)
+        {
+            e.Handled = true;
+            OnOnboardingBackClick(sender, new RoutedEventArgs());
+        }
+    }
+
+    private async Task CompleteOnboardingAsync()
+    {
+        if (!_onboardingActive) return;
+        _onboardingActive = false;
+        _onboardingStoryboard?.Stop();
+        _onboardingStoryboard = null;
+        OnboardingOverlay.Visibility = Visibility.Collapsed;
+        OnboardingSpotlight.Visibility = Visibility.Collapsed;
+        OnboardingArrow.Visibility = Visibility.Collapsed;
+        NotificationStack.Visibility = Visibility.Visible;
+        try
+        {
+            await _settings.UpdateAsync(settings => settings.General.OnboardingCompleted = true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not save onboarding state: {Message}", ex.Message);
+        }
+
+        ContentFrame.Focus(FocusState.Programmatic);
+    }
+
+    private enum OnboardingAnchor
+    {
+        Right,
+        Below,
+        Left,
+        Above
+    }
+
+    private sealed record OnboardingStep(FrameworkElement Target, OnboardingAnchor Anchor,
+        string Title, string Body);
 
     public void ShowClosingState()
     {

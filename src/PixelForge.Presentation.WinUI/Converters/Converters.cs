@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
 using PixelForge.Domain;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Converters;
 
@@ -45,20 +46,7 @@ public sealed class FileSizeConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language) => null!;
 
-    public static string FormatBytes(long bytes)
-    {
-        if (bytes <= 0) return "—";
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
-        var size = (double)bytes;
-        var unit = 0;
-        while (size >= 1024 && unit < units.Length - 1)
-        {
-            size /= 1024;
-            unit++;
-        }
-
-        return $"{size:0.#} {units[unit]}";
-    }
+    public static string FormatBytes(long bytes) => LocalizationService.FormatBytes(bytes);
 }
 
 public sealed class DurationConverter : IValueConverter
@@ -106,7 +94,7 @@ public sealed class OperationGlyphConverter : IValueConverter
 public sealed class OperationTextConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language) =>
-        value is OperationKind operation
+        Loc.T(value is OperationKind operation
             ? operation switch
             {
                 OperationKind.ImageConvert => "Image conversion",
@@ -124,7 +112,7 @@ public sealed class OperationTextConverter : IValueConverter
                 OperationKind.OcrDocument => "OCR document",
                 _ => "Processing"
             }
-            : "Processing";
+            : "Processing");
 
     public object ConvertBack(object value, Type targetType, object parameter, string language) => null!;
 }
@@ -135,11 +123,11 @@ public sealed class RelativeTimeConverter : IValueConverter
     {
         if (value is not DateTimeOffset time) return "";
         var delta = DateTimeOffset.Now - time;
-        if (delta.TotalSeconds < 60) return "just now";
-        if (delta.TotalMinutes < 60) return $"{(int)delta.TotalMinutes}m ago";
-        if (delta.TotalHours < 24) return $"{(int)delta.TotalHours}h ago";
-        if (delta.TotalDays < 7) return $"{(int)delta.TotalDays}d ago";
-        return time.LocalDateTime.ToString("MMM d");
+        if (delta.TotalSeconds < 60) return Loc.T("just now");
+        if (delta.TotalMinutes < 60) return Loc.P("Relative.MinutesAgo", (int)delta.TotalMinutes);
+        if (delta.TotalHours < 24) return Loc.P("Relative.HoursAgo", (int)delta.TotalHours);
+        if (delta.TotalDays < 7) return Loc.P("Relative.DaysAgo", (int)delta.TotalDays);
+        return time.LocalDateTime.ToString("d", LocalizationService.CurrentCulture);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language) => null!;
@@ -148,7 +136,7 @@ public sealed class RelativeTimeConverter : IValueConverter
 public sealed class PercentConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language) =>
-        value is double d ? $"{d * 100:0}%" : "0%";
+        value is double d ? LocalizationService.FormatNumber(d * 100, "0") + "%" : "0%";
 
     public object ConvertBack(object value, Type targetType, object parameter, string language) => null!;
 }

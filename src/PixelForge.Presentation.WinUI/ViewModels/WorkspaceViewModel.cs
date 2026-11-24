@@ -1,18 +1,24 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
 
-public sealed record Option<T>(T Value, string Label)
+public sealed record Option<T>(T Value, string Label) : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public override string ToString() => DisplayLabel;
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
 }
 
 public abstract partial class WorkspaceViewModel : ObservableObject
@@ -22,6 +28,7 @@ public abstract partial class WorkspaceViewModel : ObservableObject
     protected readonly IAppPaths Paths;
     protected readonly IFilePickerService FilePicker;
     private bool _loadingFormat;
+    private ValidationResult? _lastValidation;
     private CancellationTokenSource? _formatDirectorySaveCts;
 
     protected WorkspaceViewModel(MediaCategory category, ICapabilityRegistry registry, ISettingsService settings,
@@ -52,6 +59,20 @@ public abstract partial class WorkspaceViewModel : ObservableObject
         new(CollisionPolicy.Overwrite, "Replace existing files", "Overwrite only after confirmation.")
     ];
 
+    /// <summary>
+    /// Re-evaluates localized bindings and item labels in place. Collections,
+    /// selected items and staged files are never replaced.
+    /// </summary>
+    public virtual void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var format in Formats) format.RefreshLocalization();
+        foreach (var option in FormatOutputOptions) option.RefreshLocalization();
+        RefreshSummary();
+        if (_lastValidation is not null) SetValidation(_lastValidation);
+    }
+
     public abstract OperationKind Operation { get; }
     public abstract string CategoryTitle { get; }
     public abstract string CategorySubtitle { get; }
@@ -70,7 +91,7 @@ public abstract partial class WorkspaceViewModel : ObservableObject
 
     public bool HasFiles => Files.Count > 0;
     public bool HasIssues => Issues.Count > 0;
-    public string FileCountText => Files.Count == 1 ? "1 file" : $"{Files.Count} files";
+    public string FileCountText => LocalizationService.P("Count.File", Files.Count);
     public bool HasMultiFrameFiles => Files.Any(f => f.Info.IsAnimated || f.Info.IsMultipage);
     public bool HasAnimatedFiles => Files.Any(f => f.Info.IsAnimated);
     public bool HasAlphaFiles => Files.Any(f => f.Info.HasAlpha);
@@ -109,6 +130,7 @@ public abstract partial class WorkspaceViewModel : ObservableObject
 
     public void SetValidation(ValidationResult? validation)
     {
+        _lastValidation = validation;
         Issues.Clear();
         if (validation is null)
         {
@@ -122,7 +144,7 @@ public abstract partial class WorkspaceViewModel : ObservableObject
                 Issues.Add(new ValidationIssueViewModel(issue.Message, issue.Severity));
             HasValidationErrors = validation.Errors.Count > 0;
             HasValidationWarnings = validation.Warnings.Count > 0;
-            ValidationSummary = validation.Summary;
+            ValidationSummary = LocalizationService.ValidationSummary(validation);
         }
 
         OnPropertyChanged(nameof(HasIssues));
@@ -299,6 +321,8 @@ public sealed partial class FormatOutputOption : ObservableObject
     public string Label => $"{Format.ExtensionUpper} · {Format.DisplayName}";
     public string Extension => Format.ExtensionUpper;
 
+    public void RefreshLocalization() => OnPropertyChanged(nameof(Label));
+
     [ObservableProperty] private string _directory = "";
 
     [RelayCommand]
@@ -322,7 +346,7 @@ public sealed partial class ImageWorkspaceViewModel : WorkspaceViewModel
     }
 
     public override OperationKind Operation => OperationKind.ImageConvert;
-    public override string CategoryTitle => "Images";
+    public override string CategoryTitle => LocalizationService.T("Images");
     public override string CategorySubtitle => "Convert, resize and optimise still images and animations.";
     public override string CategoryGlyph => "\uE91B";
 
@@ -350,6 +374,17 @@ public sealed partial class ImageWorkspaceViewModel : WorkspaceViewModel
     ];
 
     public IReadOnlyList<string> TiffCompressionOptions { get; } = ["Lzw", "Zip", "Jpeg", "None"];
+
+    public override void RefreshLocalization()
+    {
+        base.RefreshLocalization();
+        foreach (var option in ResizeModes) option.RefreshLocalization();
+        foreach (var option in ResamplingOptions) option.RefreshLocalization();
+        foreach (var option in TransparencyOptions) option.RefreshLocalization();
+        ResizeMode.RefreshLocalization();
+        Resampling.RefreshLocalization();
+        Transparency.RefreshLocalization();
+    }
 
     [ObservableProperty] private double _quality;
     [ObservableProperty] private double _pngCompression = 6;
@@ -419,14 +454,20 @@ public sealed partial class ImageWorkspaceViewModel : WorkspaceViewModel
         if (SelectedFormat is null) return "Choose an output format";
         var resize = EnableResize
             ? ResizeWidth is > 0 || ResizeHeight is > 0
-                ? $" · resize {ResizeWidth?.ToString("0") ?? "auto"} × {ResizeHeight?.ToString("0") ?? "auto"}"
-                : " · resize enabled"
+                ? " · " + LocalizationService.F("resize {0} × {1}",
+                    ResizeWidth?.ToString("0") ?? "auto", ResizeHeight?.ToString("0") ?? "auto")
+                : " · " + LocalizationService.T("resize enabled")
             : "";
-        var animation = HasMultiFrameFiles ? (FlattenAnimation ? " · first frame" : SupportsAnimation ? " · animation preserved" : " · animation needs flattening") : "";
+        var animation = HasMultiFrameFiles
+            ? " · " + LocalizationService.T(FlattenAnimation ? "first frame"
+                : SupportsAnimation ? "animation preserved" : "animation needs flattening")
+            : "";
         return $"{FileCountText} → {SelectedFormat.ExtensionUpper}{resize}{animation}";
     }
 
-    protected override string BuildDefaultTitle() => $"Convert {FileCountText} to {SelectedFormat?.ExtensionUpper ?? "images"}";
+    protected override string BuildDefaultTitle() =>
+        LocalizationService.F("Convert {0} to {1}", FileCountText,
+            SelectedFormat?.ExtensionUpper ?? LocalizationService.T("images"));
 
     public override bool Accepts(MediaInfo info) => info.Category == MediaCategory.Image;
 

@@ -103,6 +103,7 @@ public sealed class ModelManager : IModelManager
     public async Task<ModelDownloadResult> DownloadAsync(string modelId,
         IProgress<ModelDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
     {
+        var preservePartial = false;
         var descriptor = ModelCatalog.Find(modelId);
         if (descriptor is null)
             return new ModelDownloadResult { Success = false, Error = "Unknown model." };
@@ -119,55 +120,27 @@ public sealed class ModelManager : IModelManager
             Directory.CreateDirectory(_modelDirectory);
             var finalPath = Path.Combine(_modelDirectory, descriptor.FileName);
             temp = finalPath + ".download";
-            if (File.Exists(temp)) File.Delete(temp);
-
             _logger.LogInformation("Downloading model {Model} from {Url}", descriptor.Id, descriptor.DownloadUrl);
-            using var request = new HttpRequestMessage(HttpMethod.Get, descriptor.DownloadUrl);
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            try
+            {
+                await ResumableDownloader.DownloadAsync(_httpClient, descriptor.DownloadUrl, temp,
+                    descriptor.FileSizeBytes,
+                    (received, total) => progress?.Report(new ModelDownloadProgress
+                    {
+                        ModelId = descriptor.Id,
+                        BytesReceived = received,
+                        TotalBytes = total,
+                        Stage = "Downloading"
+                    }), cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return new ModelDownloadResult
                 {
                     Success = false,
-                    Error = $"The model server returned {(int)response.StatusCode} {response.ReasonPhrase}.",
+                    Error = ex.Message,
                     Details = descriptor.DownloadUrl
                 };
-            }
-
-            var total = response.Content.Headers.ContentLength ?? descriptor.FileSizeBytes;
-            await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var target = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 128 * 1024, useAsync: true))
-            {
-                var buffer = new byte[128 * 1024];
-                long received = 0;
-                var lastReport = 0L;
-                while (true)
-                {
-                    var read = await source.ReadAsync(buffer, cancellationToken);
-                    if (read <= 0) break;
-                    await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    received += read;
-                    var now = Environment.TickCount64;
-                    if (now - lastReport > 120)
-                    {
-                        lastReport = now;
-                        progress?.Report(new ModelDownloadProgress
-                        {
-                            ModelId = descriptor.Id,
-                            BytesReceived = received,
-                            TotalBytes = total,
-                            Stage = "Downloading"
-                        });
-                    }
-                }
-
-                progress?.Report(new ModelDownloadProgress
-                {
-                    ModelId = descriptor.Id,
-                    BytesReceived = received,
-                    TotalBytes = total,
-                    Stage = "Downloading"
-                });
             }
 
             progress?.Report(new ModelDownloadProgress
@@ -227,8 +200,7 @@ public sealed class ModelManager : IModelManager
                 Stage = "Installing"
             });
 
-            if (File.Exists(finalPath)) File.Delete(finalPath);
-            File.Move(temp, finalPath);
+            InstallFileTransactional(temp, finalPath);
             temp = null;
 
             var installed = new InstalledModel
@@ -257,6 +229,7 @@ public sealed class ModelManager : IModelManager
         }
         catch (OperationCanceledException)
         {
+            preservePartial = true;
             return new ModelDownloadResult { Success = false, Error = "The model download was cancelled." };
         }
         catch (Exception ex)
@@ -271,7 +244,7 @@ public sealed class ModelManager : IModelManager
         }
         finally
         {
-            if (temp is not null)
+            if (temp is not null && !preservePartial)
             {
                 try { if (File.Exists(temp)) File.Delete(temp); } catch { }
             }
@@ -341,8 +314,7 @@ public sealed class ModelManager : IModelManager
                 return new ModelDownloadResult { Success = false, Error = $"The model could not be loaded: {validation.Error}", Details = validation.Details };
 
             var finalPath = Path.Combine(_modelDirectory, descriptor.FileName);
-            if (File.Exists(finalPath)) File.Delete(finalPath);
-            File.Move(temp, finalPath);
+            InstallFileTransactional(temp, finalPath);
             temp = null;
 
             var installed = new InstalledModel
@@ -385,6 +357,26 @@ public sealed class ModelManager : IModelManager
 
             _downloadGate.Release();
         }
+    }
+
+    public Task DiscardPartialAsync(string modelId, CancellationToken cancellationToken = default)
+    {
+        var descriptor = ModelCatalog.Find(modelId);
+        if (descriptor is null) return Task.CompletedTask;
+        var finalPath = Path.Combine(_modelDirectory, descriptor.FileName);
+        foreach (var path in new[] { finalPath + ".download", finalPath + ".download.resume.json" })
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { }
+        }
+        return Task.CompletedTask;
+    }
+
+    public bool HasPartialDownload(string modelId)
+    {
+        var descriptor = ModelCatalog.Find(modelId);
+        if (descriptor is null || descriptor.Backend == ModelBackendKind.NcnnVulkan) return false;
+        var partial = Path.Combine(_modelDirectory, descriptor.FileName) + ".download";
+        return File.Exists(partial) && new FileInfo(partial).Length > 0;
     }
 
     public async Task<bool> RemoveAsync(string modelId, CancellationToken cancellationToken = default)
@@ -441,6 +433,35 @@ public sealed class ModelManager : IModelManager
 
         var length = new FileInfo(path).Length;
         var hash = await ComputeSha256Async(path, cancellationToken);
+        var sizeMatches = descriptor.FileSizeBytes <= 0 || length == descriptor.FileSizeBytes;
+        var hashMatches = string.Equals(hash, descriptor.Sha256, StringComparison.OrdinalIgnoreCase);
+        if (!sizeMatches || !hashMatches)
+        {
+            // Never hand an unverified model to the validator: validating it
+            // would load and execute the tampered file in ONNX Runtime.
+            var rejected = new InstalledModel
+            {
+                Descriptor = descriptor,
+                FilePath = path,
+                ActualSizeBytes = length,
+                ActualSha256 = hash,
+                InstalledAt = GetInstalled(modelId)?.InstalledAt ?? DateTimeOffset.Now,
+                IsValid = false,
+                ValidationError = sizeMatches
+                    ? "The installed file does not match this model. Install it again."
+                    : "The installed file size does not match this model. Install it again."
+            };
+            lock (_lock)
+            {
+                _installed.RemoveAll(m => string.Equals(m.Descriptor.Id, modelId, StringComparison.OrdinalIgnoreCase));
+                _installed.Add(rejected);
+            }
+
+            await SaveIndexAsync(cancellationToken);
+            ModelsChanged?.Invoke(this, EventArgs.Empty);
+            return rejected;
+        }
+
         var validation = await _validator.ValidateAsync(path, descriptor, cancellationToken);
         var installed = new InstalledModel
         {
@@ -449,9 +470,7 @@ public sealed class ModelManager : IModelManager
             ActualSizeBytes = length,
             ActualSha256 = hash,
             InstalledAt = GetInstalled(modelId)?.InstalledAt ?? DateTimeOffset.Now,
-            IsValid = validation.IsValid &&
-                      string.Equals(hash, descriptor.Sha256, StringComparison.OrdinalIgnoreCase) &&
-                      (descriptor.FileSizeBytes <= 0 || length == descriptor.FileSizeBytes),
+            IsValid = validation.IsValid,
             ValidationError = validation.IsValid
                 ? null
                 : validation.Error,
@@ -517,15 +536,44 @@ public sealed class ModelManager : IModelManager
                 var prior = index.FirstOrDefault(m =>
                     string.Equals(m.Descriptor.Id, descriptor.Id, StringComparison.OrdinalIgnoreCase));
                 var sizeMatches = descriptor.FileSizeBytes <= 0 || length == descriptor.FileSizeBytes;
+                var actualHash = prior?.ActualSha256 ?? "";
+                var isValid = sizeMatches && prior is { IsValid: true };
+                string? validationError = sizeMatches
+                    ? prior?.ValidationError
+                    : "The installed file size does not match this model. Install it again.";
+
+                // A file discovered on disk without index evidence of a
+                // successful catalog verification is hashed before trust. Old
+                // 1.1.0 indexes stored an empty hash and IsValid=true, so an
+                // empty or non-catalog hash always forces re-verification.
+                var requiresHash = prior is null ||
+                                   string.IsNullOrWhiteSpace(prior.ActualSha256) ||
+                                   !string.Equals(prior.ActualSha256, descriptor.Sha256,
+                                       StringComparison.OrdinalIgnoreCase);
+                if (sizeMatches && requiresHash && !string.IsNullOrWhiteSpace(descriptor.Sha256))
+                {
+                    actualHash = await ComputeSha256Async(file, cancellationToken);
+                    if (string.Equals(actualHash, descriptor.Sha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isValid = true;
+                        validationError = null;
+                    }
+                    else
+                    {
+                        isValid = false;
+                        validationError = "The installed file does not match this model. Install it again.";
+                    }
+                }
+
                 installed.Add(new InstalledModel
                 {
                     Descriptor = descriptor,
                     FilePath = file,
                     ActualSizeBytes = length,
-                    ActualSha256 = prior?.ActualSha256 ?? "",
+                    ActualSha256 = actualHash,
                     InstalledAt = prior?.InstalledAt ?? DateTimeOffset.Now,
-                    IsValid = sizeMatches && (prior?.IsValid ?? true),
-                    ValidationError = sizeMatches ? prior?.ValidationError : "The installed file size does not match this model. Install it again.",
+                    IsValid = isValid,
+                    ValidationError = validationError,
                     VerifiedScaleFactor = prior?.VerifiedScaleFactor,
                     VerifiedInputShape = prior?.VerifiedInputShape,
                     VerifiedOutputShape = prior?.VerifiedOutputShape
@@ -536,6 +584,7 @@ public sealed class ModelManager : IModelManager
                                installed.Any(m => index.All(i =>
                                    !string.Equals(i.Descriptor.Id, m.Descriptor.Id, StringComparison.OrdinalIgnoreCase) ||
                                    i.ActualSizeBytes != m.ActualSizeBytes ||
+                                   !string.Equals(i.ActualSha256, m.ActualSha256, StringComparison.OrdinalIgnoreCase) ||
                                    i.IsValid != m.IsValid));
             lock (_lock)
             {
@@ -640,6 +689,32 @@ public sealed class ModelManager : IModelManager
             VerifiedInputShape = "NCNN/Vulkan package",
             VerifiedOutputShape = "NCNN/Vulkan package"
         };
+
+    private static void InstallFileTransactional(string source, string destination)
+    {
+        var backup = destination + ".backup";
+        try { if (File.Exists(backup)) File.Delete(backup); } catch { }
+        if (File.Exists(destination)) File.Move(destination, backup);
+        try
+        {
+            File.Move(source, destination);
+            try { if (File.Exists(backup)) File.Delete(backup); } catch { }
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(destination)) File.Delete(destination);
+                if (File.Exists(backup)) File.Move(backup, destination);
+            }
+            catch
+            {
+                // Keep the original error; the backup remains on disk for recovery.
+            }
+
+            throw;
+        }
+    }
 
     private static async Task<string> ComputeSha256Async(string path, CancellationToken cancellationToken)
     {

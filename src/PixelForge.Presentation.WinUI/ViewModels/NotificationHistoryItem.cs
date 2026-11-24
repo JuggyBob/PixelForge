@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml.Media;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
@@ -18,9 +19,10 @@ public sealed class NotificationHistoryItem
             NotificationSeverity.Error => "\uE783",
             _ => "\uE946"
         };
-        SeverityText = notification.Severity.ToString();
+        SeverityText = LocalizationService.T(notification.Severity.ToString());
         TimeText = FormatRelative(notification.CreatedAt);
-        AccessibleName = $"{SeverityText}: {Title}. {Message}. {TimeText}";
+        AccessibleName = LocalizationService.F("{0}: {1}. {2}. {3}",
+            SeverityText, Title, Message, TimeText);
     }
 
     public Guid NotificationId { get; }
@@ -35,10 +37,10 @@ public sealed class NotificationHistoryItem
     private static string FormatRelative(DateTimeOffset time)
     {
         var delta = DateTimeOffset.Now - time;
-        if (delta.TotalSeconds < 45) return "just now";
-        if (delta.TotalMinutes < 60) return $"{Math.Max(1, (int)delta.TotalMinutes)} min ago";
-        if (delta.TotalHours < 24) return $"{Math.Max(1, (int)delta.TotalHours)} h ago";
-        if (delta.TotalDays < 7) return $"{Math.Max(1, (int)delta.TotalDays)} d ago";
-        return time.LocalDateTime.ToString("MMM d, HH:mm");
+        if (delta.TotalSeconds < 45) return LocalizationService.T("just now");
+        if (delta.TotalMinutes < 60) return LocalizationService.P("Relative.MinutesAgo", Math.Max(1, (int)delta.TotalMinutes));
+        if (delta.TotalHours < 24) return LocalizationService.P("Relative.HoursAgo", Math.Max(1, (int)delta.TotalHours));
+        if (delta.TotalDays < 7) return LocalizationService.P("Relative.DaysAgo", Math.Max(1, (int)delta.TotalDays));
+        return LocalizationService.FormatDateTime(time, "g");
     }
 }

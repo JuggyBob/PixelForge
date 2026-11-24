@@ -4,6 +4,8 @@ using PixelForge.Application.Capabilities;
 using PixelForge.Application.Jobs;
 using PixelForge.Application.Media;
 using PixelForge.Application.Models;
+using PixelForge.Application.Pipelines;
+using PixelForge.Application.Updates;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Engines.FFmpeg;
 using PixelForge.Engines.Images;
@@ -18,6 +20,7 @@ using PixelForge.Infrastructure.FileSystem;
 using PixelForge.Infrastructure.Logging;
 using PixelForge.Infrastructure.Paths;
 using PixelForge.Infrastructure.Persistence;
+using PixelForge.Infrastructure.Pipelines;
 using PixelForge.Infrastructure.ProcessExecution;
 using PixelForge.Infrastructure.Settings;
 using PixelForge.Infrastructure.Watch;
@@ -49,6 +52,7 @@ public static class ServiceRegistration
         services.AddSingleton<SqliteDatabase>();
         services.AddSingleton<IJobRepository, JobRepository>();
         services.AddSingleton<IHistoryRepository, HistoryRepository>();
+        services.AddSingleton<IPipelineStore, PipelineFileStore>();
 
         services.AddSingleton<ImageEngine>();
         services.AddSingleton<FFmpegEngine>();
@@ -69,6 +73,7 @@ public static class ServiceRegistration
         services.AddSingleton<IProcessingEngine>(sp => sp.GetRequiredService<FFmpegToolsEngine>());
         services.AddSingleton<IProcessingEngine>(sp => sp.GetRequiredService<VideoUpscalingEngine>());
         services.AddSingleton<IProcessingEngine>(sp => sp.GetRequiredService<OcrEngine>());
+        services.AddSingleton<IOcrReviewService>(sp => sp.GetRequiredService<OcrEngine>());
         services.AddSingleton<IFrameUpscaler>(sp => sp.GetRequiredService<UpscalingEngine>());
         services.AddSingleton<IFrameInterpolator>(sp => sp.GetRequiredService<RifeInterpolator>());
         services.AddSingleton<IModelValidator>(sp => sp.GetRequiredService<UpscalingEngine>());
@@ -80,12 +85,16 @@ public static class ServiceRegistration
         services.AddSingleton<IWatchFolderService, WatchFolderService>();
         services.AddSingleton<INcnnRuntimeManager, NcnnRuntimeManager>();
         services.AddSingleton<ILlamaCppRuntimeManager, LlamaCppRuntimeManager>();
+        services.AddSingleton<LlamaCppRuntimeUpgradeService>();
         services.AddSingleton<ILlamaCppOcrService, LlamaCppOcrService>();
         services.AddSingleton<IModelManager, ModelManager>();
         services.AddSingleton<IOcrModelManager, OcrModelManager>();
         services.AddSingleton<JobValidator>();
         services.AddSingleton<IJobService, JobService>();
+        services.AddSingleton<PipelineValidator>();
+        services.AddSingleton<IPipelineRunService, PipelineRunService>();
         services.AddSingleton<IDiagnosticsService, SystemDiagnosticsService>();
+        services.AddSingleton<IUpdateService, UpdateService>();
         return services;
     }
 

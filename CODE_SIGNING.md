@@ -23,12 +23,22 @@ Each release signing request is approved explicitly by the approver.
 
 ## What is signed
 
-| Artifact | Signature |
+**Current status: no PixelForge release asset is signed.** PixelForge 1.0.0 and
+2.0.0 were published unsigned. SignPath enrollment and the repository secret and
+variables are not configured, so no SignPath request has been submitted and the
+v2.0.0 assets are not Authenticode-signed. Verify SHA-256 checksums before
+running any installer; Windows SmartScreen may show a warning.
+
+The table below describes the intended coverage **for a future signed release**;
+it does not apply to 1.0.0 or 2.0.0.
+
+| Artifact | Signature in a future signed release |
 |---|---|
 | `PixelForge.exe` | Authenticode, timestamped |
 | `PixelForge-Setup-<version>-x64.exe` | Authenticode, timestamped |
 | `PixelForge.exe` inside the portable ZIP | Authenticode, timestamped |
 | Portable ZIP itself | Not an Authenticode format; the contained executable is signed |
+| MSI | Not covered by the current SignPath release workflow |
 
 Third-party executables and libraries redistributed with PixelForge, such as
 FFmpeg, Pandoc, Typst, 7-Zip, and Zstandard, remain under their upstream
@@ -36,11 +46,15 @@ publishers and are not signed with the PixelForge/SignPath certificate. The
 Inno Setup uninstaller stub generated on the user's machine is not covered by
 the setup executable's signature.
 
-The certificate is issued to **SignPath Foundation**, not to PixelForge. Windows
-will display SignPath Foundation as the publisher. The signature links the
-binary to this repository and its GitHub Actions build.
+For a future signed release, the certificate will be issued to **SignPath
+Foundation**, not to PixelForge. Windows will display SignPath Foundation as the
+publisher. The signature will link the binary to this repository and its GitHub
+Actions build.
 
-## Release workflow
+## Release workflow (not used for 2.0.0)
+
+The v2.0.0 EXE, MSI, and portable ZIP were built locally and published unsigned.
+The workflow below is retained for the future first signed release only.
 
 The signed-release workflow is defined in
 [`.github/workflows/release-sign.yml`](.github/workflows/release-sign.yml).
@@ -59,12 +73,13 @@ The signed-release workflow is defined in
 Signing requests time out if they are not approved. A failed or rejected
 request does not produce release assets.
 
-## Version 1.0.0
+## Versions 1.0.0 and 2.0.0 (unsigned)
 
-PixelForge 1.0.0 was published before SignPath Foundation enrollment. Its
-existing release assets are **unsigned**. They will not be silently replaced;
-signed binaries will be published in a later version after enrollment is
-approved.
+PixelForge 1.0.0 was published before SignPath Foundation enrollment and remains
+unsigned. PixelForge 2.0.0 is also published unsigned: enrollment and the
+required GitHub secret and variables are not configured, so no signing request
+was made and no signed assets were uploaded. Existing release assets are not
+replaced. A future version will be the first signed release after approval.
 
 ## Privacy
 

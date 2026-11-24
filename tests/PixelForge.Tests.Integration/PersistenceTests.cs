@@ -196,6 +196,116 @@ public sealed class PersistenceTests
     }
 
     [Fact]
+    public async Task History_query_migrates_an_existing_v1_database_before_reading()
+    {
+        using var paths = new TempAppPaths();
+        Directory.CreateDirectory(paths.RootDirectory);
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={paths.DatabaseFile}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE History (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    JobId TEXT NOT NULL,
+                    ItemId TEXT NOT NULL,
+                    Operation INTEGER NOT NULL,
+                    Title TEXT NOT NULL,
+                    InputPath TEXT NULL,
+                    OutputPath TEXT NULL,
+                    InputFileName TEXT NULL,
+                    OutputFileName TEXT NULL,
+                    InputBytes INTEGER NOT NULL DEFAULT 0,
+                    OutputBytes INTEGER NULL,
+                    FormatId TEXT NULL,
+                    SettingsJson TEXT NULL,
+                    DurationMs REAL NOT NULL DEFAULT 0,
+                    Status INTEGER NOT NULL,
+                    Error TEXT NULL,
+                    CreatedAt TEXT NOT NULL,
+                    VerificationSummary TEXT NULL
+                );
+                INSERT INTO History (JobId, ItemId, Operation, Title, InputFileName, Status, CreatedAt)
+                VALUES ('11111111-1111-1111-1111-111111111111',
+                        '22222222-2222-2222-2222-222222222222', 1, 'Legacy row', 'legacy.png', 2, '2026-01-01T00:00:00.0000000+00:00');
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var database = new SqliteDatabase(paths, NullLogger<SqliteDatabase>.Instance);
+        var repository = new HistoryRepository(database, NullLogger<HistoryRepository>.Instance);
+
+        var entries = await repository.QueryAsync(new HistoryQuery { Limit = 10 });
+
+        var entry = Assert.Single(entries);
+        Assert.Equal("Legacy row", entry.Title);
+        Assert.Equal("legacy.png", entry.InputFileName);
+        Assert.Null(entry.ErrorDetails);
+    }
+
+    [Fact]
+    public async Task History_export_import_round_trips_and_skips_duplicates()
+    {
+        using var paths = new TempAppPaths();
+        var database = new SqliteDatabase(paths, NullLogger<SqliteDatabase>.Instance);
+        var repository = new HistoryRepository(database, NullLogger<HistoryRepository>.Instance);
+        await repository.InitializeAsync();
+
+        var jobId = Guid.NewGuid();
+        var itemId = Guid.NewGuid();
+        await repository.AddAsync(new HistoryEntry
+        {
+            JobId = jobId,
+            ItemId = itemId,
+            Operation = OperationKind.OcrDocument,
+            Title = "OCR",
+            InputPath = @"C:\media\page.png",
+            OutputPath = @"C:\media\page.docx",
+            InputFileName = "page.png",
+            OutputFileName = "page.docx",
+            InputBytes = 100,
+            OutputBytes = 200,
+            FormatId = "docx",
+            DurationMs = 42,
+            Status = JobItemState.Completed,
+            CreatedAt = DateTimeOffset.Now,
+            RequestedProvider = "DirectML",
+            ActualProvider = "CPU",
+            FallbackReason = "DirectML unavailable",
+            ModelId = "ppocrv6-small"
+        });
+
+        var exported = await repository.ExportAsync(new HistoryQuery { Limit = 100 }, "1.1.0-internal");
+        Assert.Equal(1, exported.SchemaVersion);
+        Assert.Single(exported.Entries);
+
+        await repository.ClearAsync();
+        Assert.Equal(0, await repository.CountAsync());
+
+        var imported = await repository.ImportAsync(exported);
+        Assert.Equal(1, imported.Imported);
+        Assert.Equal(0, imported.Skipped);
+        Assert.Equal(0, imported.Invalid);
+        Assert.Equal(1, await repository.CountAsync());
+
+        var duplicate = await repository.ImportAsync(exported);
+        Assert.Equal(0, duplicate.Imported);
+        Assert.Equal(1, duplicate.Skipped);
+
+        var invalid = await repository.ImportAsync(exported with
+        {
+            SchemaVersion = 2
+        });
+        Assert.Equal(1, invalid.Invalid);
+        Assert.NotEmpty(invalid.Warnings);
+
+        var loaded = Assert.Single(await repository.GetRecentAsync());
+        Assert.Equal("CPU", loaded.ActualProvider);
+        Assert.Equal("DirectML", loaded.RequestedProvider);
+        Assert.Equal("ppocrv6-small", loaded.ModelId);
+    }
+
+    [Fact]
     public async Task Job_repository_round_trips_batch_and_items()
     {
         using var paths = new TempAppPaths();

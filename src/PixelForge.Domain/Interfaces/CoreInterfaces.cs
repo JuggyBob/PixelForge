@@ -97,7 +97,8 @@ public sealed record FrameInterpolationResult
 public interface IOutputPathService
 {
     string BuildOutputPath(string inputPath, string outputDirectory, string extension, string suffix,
-        string? relativeDirectory, CollisionPolicy collisionPolicy, out string? adjustmentNote);
+        string? relativeDirectory, CollisionPolicy collisionPolicy, out string? adjustmentNote,
+        string? preferredBaseName = null);
     string EnsureUniquePath(string desiredPath);
     bool IsPathInside(string childPath, string parentPath);
 }
@@ -143,6 +144,11 @@ public interface IHistoryRepository
     Task<long> AddAsync(HistoryEntry entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<HistoryEntry>> GetRecentAsync(int limit = 200, string? search = null,
         OperationKind? operation = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<HistoryEntry>> QueryAsync(HistoryQuery query, CancellationToken cancellationToken = default);
+    Task<HistoryExportDocument> ExportAsync(HistoryQuery query, string appVersion,
+        CancellationToken cancellationToken = default);
+    Task<HistoryImportResult> ImportAsync(HistoryExportDocument document,
+        CancellationToken cancellationToken = default);
     Task<HistoryEntry?> GetAsync(long id, CancellationToken cancellationToken = default);
     Task ClearAsync(CancellationToken cancellationToken = default);
     Task<int> DeleteOlderThanAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);

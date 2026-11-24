@@ -4,18 +4,22 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class VideoUpscalerPage : Page
+public sealed partial class VideoUpscalerPage : Page, ILocalizationAwarePage
 {
     public VideoUpscalerViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public VideoUpscalerPage()
     {
         ViewModel = App.Services.GetRequiredService<VideoUpscalerViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -37,7 +41,7 @@ public sealed partial class VideoUpscalerPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Add videos to the Video Upscaler";
+            e.DragUIOverride.Caption = LocalizationService.T("Add videos to the Video Upscaler");
             e.DragUIOverride.IsContentVisible = true;
         }
     }

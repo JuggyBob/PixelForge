@@ -13,7 +13,7 @@ using PixelForge.Engines.Documents;
 
 namespace PixelForge.Engines.OCR;
 
-public sealed class OcrEngine : IProcessingEngine, IDisposable
+public sealed class OcrEngine : IProcessingEngine, IOcrReviewService, IDisposable
 {
     private readonly IOcrModelManager _models;
     private readonly DocumentEngine _documents;
@@ -23,6 +23,7 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
     private readonly ILogger<OcrEngine> _logger;
     private readonly SemaphoreSlim _sessionGate = new(1, 1);
     private PpOcrV6Runner? _runner;
+    private readonly List<PpOcrV6Runner> _retiredRunners = [];
     private string? _runnerKey;
     private bool _disposed;
 
@@ -165,6 +166,13 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
             return ProcessingResult.Fail("The OCR settings are invalid.");
 
         var pages = settings.PagePaths.Count > 0 ? settings.PagePaths : [request.InputPath];
+        if (!string.IsNullOrWhiteSpace(settings.ReviewedMarkdownPath))
+        {
+            if (!File.Exists(settings.ReviewedMarkdownPath))
+                return ProcessingResult.Fail("The reviewed OCR text is missing.",
+                    "The reviewed text file was removed. Run the OCR review again or disable review before export.", stopwatch.Elapsed);
+            return await ProcessReviewedAsync(request, settings, progress, cancellationToken);
+        }
         var installed = await _models.ResolveAsync(settings.OcrModelId, cancellationToken);
         if (installed is null)
             return ProcessingResult.Fail("The selected OCR model is not installed or failed validation.");
@@ -304,7 +312,18 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
             stopwatch.Stop();
             return ProcessingResult.Ok(request.TempOutputPath, outputInfo,
                 new FileInfo(request.TempOutputPath).Length, stopwatch.Elapsed, verification, warnings)
-                with { AdditionalOutputPaths = additional };
+                with
+                {
+                    AdditionalOutputPaths = additional,
+                    RequestedProvider = settings.ExecutionProvider.ToString(),
+                    ActualProvider = runner.ProviderDescription,
+                    FallbackReason = settings.ExecutionProvider == ExecutionProviderKind.DirectML &&
+                                     runner.ActualProvider == ExecutionProviderKind.Cpu
+                        ? "DirectML could not initialize the OCR sessions; PP-OCRv6 ran on the CPU."
+                        : null,
+                    ModelId = settings.OcrModelId,
+                    RuntimeVersion = "ONNX Runtime"
+                };
         }
         catch (OperationCanceledException)
         {
@@ -320,6 +339,200 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
         finally
         {
             try { if (Directory.Exists(workDir)) Directory.Delete(workDir, recursive: true); } catch { }
+        }
+    }
+
+    public async Task<OcrReviewResult> RecognizeAsync(OcrSettings settings,
+        IProgress<ProcessingProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        var pages = settings.PagePaths.Count > 0 ? settings.PagePaths : [];
+        if (pages.Count == 0)
+            return new OcrReviewResult { Error = "Add at least one page before reviewing OCR text." };
+
+        var installed = await _models.ResolveAsync(settings.OcrModelId, cancellationToken);
+        if (installed is null)
+            return new OcrReviewResult { Error = "The selected OCR model is not installed or failed validation." };
+
+        try
+        {
+            if (installed.Descriptor.Backend == OcrBackendKind.LlamaCpp)
+            {
+                var useGpu = settings.ExecutionProvider != ExecutionProviderKind.Cpu;
+                var result = await _llama.RecognizeAsync(installed, pages,
+                    installed.Descriptor.Prompt ?? "Extract all text in reading order. Preserve tables as Markdown.",
+                    useGpu, progress ?? new Progress<ProcessingProgress>(), cancellationToken);
+                if (!result.Success)
+                    return new OcrReviewResult
+                    {
+                        Error = result.Error ?? "Advanced OCR inference failed.",
+                        ErrorDetails = result.Details
+                    };
+                return new OcrReviewResult
+                {
+                    Success = true,
+                    Markdown = result.Markdown,
+                    Provider = result.Provider,
+                    ModelId = settings.OcrModelId,
+                    RuntimeVersion = "llama.cpp " + LlamaCppRuntimeCatalog.Vulkan.Version,
+                    Warnings = string.IsNullOrWhiteSpace(result.Warning) ? [] : [result.Warning]
+                };
+            }
+
+            var warnings = new List<string>();
+            var runner = await GetRunnerAsync(installed, settings.ExecutionProvider, cancellationToken);
+            if (runner.ActualProvider == ExecutionProviderKind.Cpu &&
+                settings.ExecutionProvider == ExecutionProviderKind.DirectML)
+                warnings.Add("DirectML could not initialize PP-OCRv6; the preview ran on the CPU instead.");
+            else if (runner.IsMixedProvider)
+                warnings.Add("The OCR detector and recognizer did not run on the same provider: " +
+                             $"detector {runner.DetectorProvider}, recognizer {runner.RecognizerProvider}.");
+
+            var pageResults = new List<OcrPageLines>();
+            for (var i = 0; i < pages.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(ProcessingProgress.Percent(
+                    0.05 + 0.9 * i / Math.Max(1, pages.Count),
+                    $"Recognizing page {i + 1} of {pages.Count}…"));
+                var page = await Task.Run(
+                    () => runner.Recognize(pages[i], settings.Preprocess, cancellationToken),
+                    cancellationToken);
+                pageResults.Add(new OcrPageLines(i + 1, page.Width, page.Height, page.Lines));
+            }
+
+            if (pageResults.All(p => p.Lines.Count == 0))
+                return new OcrReviewResult { Error = "No readable text was detected on any page." };
+
+            var lowConfidence = pageResults.SelectMany(p => p.Lines)
+                .Count(l => l.Confidence > 0 && l.Confidence < 0.55f);
+            if (lowConfidence > 0)
+                warnings.Add($"{lowConfidence} low-confidence text region{(lowConfidence == 1 ? "" : "s")} " +
+                             "were retained. Correct them in the review before export.");
+
+            return new OcrReviewResult
+            {
+                Success = true,
+                Markdown = OcrMarkdownBuilder.Build(pageResults),
+                Provider = runner.ProviderDescription,
+                ModelId = settings.OcrModelId,
+                RuntimeVersion = "ONNX Runtime",
+                Warnings = warnings
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OCR review failed");
+            return new OcrReviewResult
+            {
+                Error = "OCR review failed.",
+                ErrorDetails = ex.ToString()
+            };
+        }
+    }
+
+    private async Task<ProcessingResult> ProcessReviewedAsync(ProcessingRequest request, OcrSettings settings,
+        IProgress<ProcessingProgress> progress, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var reviewedPath = settings.ReviewedMarkdownPath!;
+        string? pdfTemp = null;
+        try
+        {
+            var warnings = new List<string>
+            {
+                "The reviewed OCR text was used instead of running recognition again."
+            };
+            if (!string.IsNullOrWhiteSpace(settings.ReviewedProvider))
+                warnings.Add($"Reviewed text was produced by {settings.ReviewedProvider}.");
+
+            progress.Report(ProcessingProgress.Percent(0.6, "Using reviewed text…"));
+            var docxRequest = BuildDocumentRequest(request, reviewedPath, request.TempOutputPath, "docx", settings);
+            var docxResult = await _documents.ProcessAsync(docxRequest, progress, cancellationToken);
+            if (!docxResult.Success)
+                return ProcessingResult.Fail(docxResult.Error ?? "The DOCX could not be generated.", docxResult.ErrorDetails,
+                    stopwatch.Elapsed);
+
+            var docxVerification = await _documents.VerifyOutputAsync(docxRequest, request.TempOutputPath, cancellationToken);
+            if (!docxVerification.IsValid)
+                return ProcessingResult.Fail("The generated DOCX failed verification.", docxVerification.Details,
+                    stopwatch.Elapsed);
+
+            var structuralWarning = VerifyDocxStructure(request.TempOutputPath, settings.PagePaths.Count);
+            if (structuralWarning is not null) warnings.Add(structuralWarning);
+            warnings.AddRange(docxResult.Warnings);
+
+            var additional = new List<string>();
+            if (settings.GeneratePdf)
+            {
+                progress.Report(ProcessingProgress.Percent(0.92, "Generating PDF…"));
+                pdfTemp = Path.ChangeExtension(request.TempOutputPath, ".pdf");
+                var pdfRequest = BuildDocumentRequest(request, request.TempOutputPath, pdfTemp, "pdf", settings,
+                    docxVerification.ActualInfo);
+                var pdfResult = await _documents.ProcessAsync(pdfRequest, progress, cancellationToken);
+                if (pdfResult.Success)
+                {
+                    var pdfVerification = await _documents.VerifyOutputAsync(pdfRequest, pdfTemp, cancellationToken);
+                    if (pdfVerification.IsValid)
+                    {
+                        additional.Add(pdfTemp);
+                        warnings.Add("PDF also generated beside the DOCX.");
+                    }
+                    else
+                    {
+                        warnings.Add("The PDF failed verification and was removed. The DOCX is still available.");
+                        TryDelete(pdfTemp);
+                        pdfTemp = null;
+                    }
+                }
+                else
+                {
+                    warnings.Add("The PDF could not be generated. The DOCX is still available. " +
+                                 (pdfResult.Error ?? ""));
+                    TryDelete(pdfTemp);
+                    pdfTemp = null;
+                }
+            }
+
+            var outputInfo = docxVerification.ActualInfo ?? new MediaInfo
+            {
+                FilePath = request.TempOutputPath,
+                FileName = Path.GetFileName(request.TempOutputPath),
+                Extension = ".docx",
+                FileSizeBytes = new FileInfo(request.TempOutputPath).Length,
+                Category = MediaCategory.Document,
+                FormatId = "docx",
+                FormatName = "Microsoft Word document",
+                EngineId = EngineIds.Documents
+            };
+            var summary = $"OCR · reviewed text · {settings.PagePaths.Count} page" +
+                          $"{(settings.PagePaths.Count == 1 ? "" : "s")}";
+            stopwatch.Stop();
+            return ProcessingResult.Ok(request.TempOutputPath, outputInfo,
+                    new FileInfo(request.TempOutputPath).Length, stopwatch.Elapsed,
+                    VerificationResult.Ok(outputInfo, summary), warnings)
+                with
+                {
+                    AdditionalOutputPaths = additional,
+                    RequestedProvider = settings.ExecutionProvider.ToString(),
+                    ActualProvider = settings.ReviewedProvider ?? "Reviewed text",
+                    ModelId = settings.OcrModelId,
+                    RuntimeVersion = settings.ReviewedRuntimeVersion ?? "Reviewed text"
+                };
+        }
+        catch (OperationCanceledException)
+        {
+            TryDelete(pdfTemp);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reviewed OCR document generation failed");
+            TryDelete(pdfTemp);
+            return ProcessingResult.Fail("Reviewed OCR document generation failed.", ex.ToString(), stopwatch.Elapsed);
         }
     }
 
@@ -414,7 +627,18 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
             stopwatch.Stop();
             return ProcessingResult.Ok(request.TempOutputPath, outputInfo,
                     new FileInfo(request.TempOutputPath).Length, stopwatch.Elapsed, verification, warnings)
-                with { AdditionalOutputPaths = additional };
+                with
+                {
+                    AdditionalOutputPaths = additional,
+                    RequestedProvider = settings.ExecutionProvider.ToString(),
+                    ActualProvider = result.Provider,
+                    FallbackReason = settings.ExecutionProvider is ExecutionProviderKind.DirectML or ExecutionProviderKind.Vulkan &&
+                                     result.Provider.Contains("CPU", StringComparison.OrdinalIgnoreCase)
+                        ? "The requested GPU provider was unavailable; advanced OCR ran on the CPU."
+                        : null,
+                    ModelId = settings.OcrModelId,
+                    RuntimeVersion = "llama.cpp " + LlamaCppRuntimeCatalog.Vulkan.Version
+                };
         }
         catch (OperationCanceledException)
         {
@@ -463,8 +687,11 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
             var key = $"{model.Descriptor.Id}|{provider}";
             if (_runner is not null && string.Equals(_runnerKey, key, StringComparison.Ordinal))
                 return _runner;
-            _runner?.Dispose();
-            _runner = null;
+            if (_runner is not null)
+            {
+                _retiredRunners.Add(_runner);
+                _runner = null;
+            }
             _runner = new PpOcrV6Runner(model.DetectorPath, model.RecognizerPath, model.DictionaryPath, provider);
             _runnerKey = key;
             _logger.LogInformation("Loaded OCR model {Model} on {Provider}", model.Descriptor.Id, _runner.ActualProvider);
@@ -538,6 +765,8 @@ public sealed class OcrEngine : IProcessingEngine, IDisposable
         if (_disposed) return;
         _disposed = true;
         _runner?.Dispose();
+        foreach (var retired in _retiredRunners) retired.Dispose();
+        _retiredRunners.Clear();
         _sessionGate.Dispose();
     }
 }

@@ -16,6 +16,10 @@ public sealed class ProcessingJob
     public string? ErrorDetails { get; set; }
     public string? SourcePath { get; init; }
     public bool PreserveRelativePaths { get; init; }
+    public Guid? PipelineId { get; init; }
+    public string? PipelineName { get; init; }
+    public int PipelineStep { get; init; }
+    public int PipelineStepCount { get; init; }
     public List<JobItem> Items { get; init; } = [];
     public string? BatchSummary { get; set; }
 
@@ -71,6 +75,7 @@ public sealed class JobItem
     public required string InputPath { get; init; }
     public required string FileName { get; init; }
     public string? RelativeDirectory { get; init; }
+    public string? PreferredOutputName { get; init; }
     public string? OutputPath { get; set; }
     public string? TempPath { get; set; }
     public JobItemState State { get; set; } = JobItemState.Pending;
@@ -78,6 +83,13 @@ public sealed class JobItem
     public string? Message { get; set; }
     public string? Error { get; set; }
     public string? ErrorDetails { get; set; }
+    public string? ErrorCategory { get; set; }
+    public string? EngineLog { get; set; }
+    public string? RequestedProvider { get; set; }
+    public string? ActualProvider { get; set; }
+    public string? FallbackReason { get; set; }
+    public string? RuntimeVersion { get; set; }
+    public string? ModelId { get; set; }
     public string? SkipReason { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
@@ -89,6 +101,7 @@ public sealed class JobItem
     public MediaInfo? OutputInfo { get; set; }
     public string? OutputFormatId { get; set; }
     public IReadOnlyList<string> Warnings { get; set; } = [];
+    public List<string> AdditionalOutputPaths { get; set; } = [];
     public string? VerificationSummary { get; set; }
     public bool IsBatchChild { get; init; }
     public int SortOrder { get; init; }
@@ -122,6 +135,10 @@ public sealed record JobRequest
     public string? SourcePath { get; init; }
     public bool PreserveRelativePaths { get; init; }
     public string? BatchSummary { get; init; }
+    public Guid? PipelineId { get; init; }
+    public string? PipelineName { get; init; }
+    public int PipelineStep { get; init; }
+    public int PipelineStepCount { get; init; }
 }
 
 public sealed record HistoryEntry
@@ -142,6 +159,19 @@ public sealed record HistoryEntry
     public double DurationMs { get; init; }
     public JobItemState Status { get; init; }
     public string? Error { get; init; }
+    public string? ErrorDetails { get; init; }
+    public string? ErrorCategory { get; init; }
+    public string? EngineLog { get; init; }
+    public string? WarningsJson { get; init; }
+    public string? RequestedProvider { get; init; }
+    public string? ActualProvider { get; init; }
+    public string? FallbackReason { get; init; }
+    public string? RuntimeVersion { get; init; }
+    public string? ModelId { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public string? VerificationSummary { get; init; }
+    public Guid? PipelineId { get; init; }
+    public string? PipelineName { get; init; }
+    public int PipelineStep { get; init; }
+    public int PipelineStepCount { get; init; }
 }

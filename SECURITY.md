@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are applied to the latest public release. The current release is
-PixelForge 1.0.0.
+PixelForge 2.0.0. Version 1.0.0 is no longer supported.
 
 ## Reporting a vulnerability
 

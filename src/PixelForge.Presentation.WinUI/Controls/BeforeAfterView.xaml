@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Controls.BeforeAfterView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     Background="Transparent">
 
     <Grid x:Name="Viewport" Background="{ThemeResource ComparisonBackgroundBrush}"
@@ -31,14 +32,14 @@
 
         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6" Padding="8,4"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" IsHitTestVisible="False">
-            <TextBlock Text="Original" FontSize="11" FontWeight="SemiBold" />
+            <TextBlock loc:Loc.Text="Original" FontSize="11" FontWeight="SemiBold" />
         </Border>
         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6" Padding="8,4"
                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" IsHitTestVisible="False">
-            <TextBlock Text="Upscaled" FontSize="11" FontWeight="SemiBold" />
+            <TextBlock loc:Loc.Text="Upscaled" FontSize="11" FontWeight="SemiBold" />
         </Border>
 
-        <TextBlock x:Name="EmptyText" Text="Choose an original and a processed image to compare."
+        <TextBlock x:Name="EmptyText" loc:Loc.Text="Choose an original and a processed image to compare."
                    HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     </Grid>

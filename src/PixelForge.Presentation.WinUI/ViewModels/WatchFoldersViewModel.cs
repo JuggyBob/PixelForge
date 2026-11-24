@@ -1,17 +1,29 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
 
+public sealed record WatchOperationOption(OperationKind Operation, MediaCategory Category, string Label)
+    : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
+}
+
 public sealed partial class WatchFolderItemViewModel : ObservableObject
 {
-    private readonly WatchFolderRule _rule;
+    private WatchFolderRule _rule;
     private readonly WatchFoldersViewModel _owner;
     private bool _syncing;
 
@@ -20,17 +32,69 @@ public sealed partial class WatchFolderItemViewModel : ObservableObject
         _rule = rule;
         _owner = owner;
         _isEnabled = rule.IsEnabled;
+        _editName = rule.Name;
+        _editInput = rule.InputDirectory;
+        _editOutput = rule.OutputDirectory;
+        _editIncludeSubdirectories = rule.IncludeSubdirectories;
+        _editIgnoreProcessed = rule.IgnorePreviouslyProcessed;
+        _editEnabled = rule.IsEnabled;
+        var editModelId = rule.Settings is UpscaleSettings u ? u.ModelId :
+            rule.Settings is VideoUpscaleSettings v ? v.ImageModelId : "";
+        var editInterpolationModelId = rule.Settings is VideoUpscaleSettings v2
+            ? v2.InterpolationModelId
+            : "rife-4.25-lite";
+        _editImageModel = owner.ImageModels.FirstOrDefault(c =>
+            string.Equals(c.Id, editModelId, StringComparison.OrdinalIgnoreCase));
+        _editInterpolationModel = owner.InterpolationModels.FirstOrDefault(c =>
+            string.Equals(c.Id, editInterpolationModelId, StringComparison.OrdinalIgnoreCase));
+        _editScale = rule.Settings is UpscaleSettings u2 ? u2.ScaleFactor :
+            rule.Settings is VideoUpscaleSettings v3 ? v3.ScaleFactor : 4;
+        _editEnableInterpolation = rule.Settings is VideoUpscaleSettings v4 && v4.EnableInterpolation;
+        _editTemporalStability = rule.Settings is VideoUpscaleSettings v5 && v5.EnableTemporalStability;
+        _editTemporalStrength = rule.Settings is VideoUpscaleSettings v6 ? v6.TemporalStabilityStrength : 50;
+        _editAlgorithm = owner.Algorithms.FirstOrDefault(a =>
+                             rule.Settings is UpscaleSettings us && a.Value == us.Algorithm)
+                         ?? owner.Algorithms.First(a => a.Value == ResamplingAlgorithm.Lanczos);
     }
 
+    public WatchFoldersViewModel Owner => _owner;
     public Guid Id => _rule.Id;
     public string Name => _rule.Name;
     public string InputDirectory => _rule.InputDirectory;
     public string OutputDirectory => _rule.OutputDirectory;
     public string OperationLabel => _rule.OperationLabel;
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
     public string StatusText => _rule.StatusText;
     public bool HasError => !string.IsNullOrWhiteSpace(_rule.LastError);
     public string ErrorText => _rule.LastError ?? "";
-    public string Detail => $"{_rule.OperationLabel} · {(_rule.IncludeSubdirectories ? "include subfolders" : "top folder only")}";
+    public string Detail => LocalizationService.F("{0} · {1}", LocalizationService.T(_rule.OperationLabel),
+        LocalizationService.T(_rule.IncludeSubdirectories ? "include subfolders" : "top folder only"));
+    public bool IsUpscaleRule => _rule.Operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional or OperationKind.VideoUpscale;
+    public bool IsVideoUpscale => _rule.Operation == OperationKind.VideoUpscale;
+    public bool IsAiUpscale => _rule.Operation == OperationKind.UpscaleAi;
+    public bool IsTraditionalUpscale => _rule.Operation == OperationKind.UpscaleTraditional;
+    public ObservableCollection<WatchModelChoice> ImageModels => _owner.ImageModels;
+    public ObservableCollection<WatchModelChoice> InterpolationModels => _owner.InterpolationModels;
+    public IReadOnlyList<Option<ResamplingAlgorithm>> Algorithms => _owner.Algorithms;
+
+    [ObservableProperty] private bool _isEditing;
+    public string ChevronGlyph => IsEditing ? "\uE70E" : "\uE70D";
+
+    partial void OnIsEditingChanged(bool value) => OnPropertyChanged(nameof(ChevronGlyph));
+    [ObservableProperty] private string _editName;
+    [ObservableProperty] private string _editInput;
+    [ObservableProperty] private string _editOutput;
+    [ObservableProperty] private bool _editIncludeSubdirectories;
+    [ObservableProperty] private bool _editIgnoreProcessed;
+    [ObservableProperty] private bool _editEnabled;
+    [ObservableProperty] private WatchModelChoice? _editImageModel;
+    [ObservableProperty] private WatchModelChoice? _editInterpolationModel;
+    [ObservableProperty] private Option<ResamplingAlgorithm> _editAlgorithm =
+        new(ResamplingAlgorithm.Lanczos, "Lanczos");
+    [ObservableProperty] private double _editScale;
+    [ObservableProperty] private bool _editEnableInterpolation;
+    [ObservableProperty] private bool _editTemporalStability;
+    [ObservableProperty] private double _editTemporalStrength;
 
     [ObservableProperty] private bool _isEnabled;
 
@@ -47,6 +111,112 @@ public sealed partial class WatchFolderItemViewModel : ObservableObject
         _syncing = false;
     }
 
+    public void ApplyRule(WatchFolderRule rule)
+    {
+        _rule = rule;
+        SyncEnabled(rule.IsEnabled);
+        ResetDraft();
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(InputDirectory));
+        OnPropertyChanged(nameof(OutputDirectory));
+        OnPropertyChanged(nameof(OperationLabel));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(HasError));
+        OnPropertyChanged(nameof(ErrorText));
+        OnPropertyChanged(nameof(Detail));
+        OnPropertyChanged(nameof(IsUpscaleRule));
+        OnPropertyChanged(nameof(IsVideoUpscale));
+        OnPropertyChanged(nameof(IsAiUpscale));
+        OnPropertyChanged(nameof(IsTraditionalUpscale));
+    }
+
+    [RelayCommand]
+    private void ToggleEdit()
+    {
+        if (IsEditing) CancelEdit();
+        else BeginEdit();
+    }
+
+    [RelayCommand]
+    private void BeginEdit()
+    {
+        ResetDraft();
+        _owner.BeginEdit(this);
+        IsEditing = true;
+    }
+
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        IsEditing = false;
+        ResetDraft();
+        _owner.CancelEdit(this);
+    }
+
+    private void ResetDraft()
+    {
+        EditName = _rule.Name;
+        EditInput = _rule.InputDirectory;
+        EditOutput = _rule.OutputDirectory;
+        EditIncludeSubdirectories = _rule.IncludeSubdirectories;
+        EditIgnoreProcessed = _rule.IgnorePreviouslyProcessed;
+        EditEnabled = _rule.IsEnabled;
+        var imageId = _rule.Settings is UpscaleSettings u ? u.ModelId :
+            _rule.Settings is VideoUpscaleSettings v ? v.ImageModelId : null;
+        var interpolationId = _rule.Settings is VideoUpscaleSettings v2 ? v2.InterpolationModelId : null;
+        EditImageModel = ImageModels.FirstOrDefault(c =>
+                             string.Equals(c.Id, imageId, StringComparison.OrdinalIgnoreCase))
+                         ?? ImageModels.FirstOrDefault();
+        EditInterpolationModel = InterpolationModels.FirstOrDefault(c =>
+                                     string.Equals(c.Id, interpolationId, StringComparison.OrdinalIgnoreCase))
+                                 ?? InterpolationModels.FirstOrDefault();
+        EditScale = _rule.Settings is UpscaleSettings u2 ? u2.ScaleFactor :
+            _rule.Settings is VideoUpscaleSettings v3 ? v3.ScaleFactor : 4;
+        EditEnableInterpolation = _rule.Settings is VideoUpscaleSettings v4 && v4.EnableInterpolation;
+        EditTemporalStability = _rule.Settings is VideoUpscaleSettings v5 && v5.EnableTemporalStability;
+        EditTemporalStrength = _rule.Settings is VideoUpscaleSettings v6 ? v6.TemporalStabilityStrength : 50;
+        EditAlgorithm = Algorithms.FirstOrDefault(a =>
+                            _rule.Settings is UpscaleSettings us && a.Value == us.Algorithm)
+                        ?? Algorithms.First(a => a.Value == ResamplingAlgorithm.Lanczos);
+    }
+
+    [RelayCommand]
+    private async Task SaveEditAsync()
+    {
+        var updated = _rule.Clone();
+        updated.Name = string.IsNullOrWhiteSpace(EditName) ? "Watched folder" : EditName.Trim();
+        updated.InputDirectory = EditInput;
+        updated.OutputDirectory = EditOutput;
+        updated.IncludeSubdirectories = EditIncludeSubdirectories;
+        updated.IgnorePreviouslyProcessed = EditIgnoreProcessed;
+        updated.IsEnabled = EditEnabled;
+        updated.Settings.OutputDirectory = EditOutput;
+        if (updated.Settings is UpscaleSettings upscale)
+        {
+            upscale.ModelId = EditImageModel?.Id ?? upscale.ModelId;
+            upscale.Algorithm = EditAlgorithm?.Value ?? upscale.Algorithm;
+            upscale.ScaleFactor = (int)Math.Clamp(EditScale, 1, 16);
+        }
+        else if (updated.Settings is VideoUpscaleSettings video)
+        {
+            video.ImageModelId = EditImageModel?.Id ?? video.ImageModelId;
+            video.InterpolationModelId = EditInterpolationModel?.Id ?? video.InterpolationModelId;
+            video.ScaleFactor = (int)Math.Clamp(EditScale, 1, 16);
+            video.EnableInterpolation = EditEnableInterpolation;
+            video.EnableTemporalStability = EditTemporalStability;
+            video.TemporalStabilityStrength = (int)Math.Clamp(EditTemporalStrength, 0, 100);
+        }
+
+        if (await _owner.UpdateRuleAsync(updated))
+            IsEditing = false;
+    }
+
+    [RelayCommand]
+    private void ManageImageModels() => _owner.ManageImageModelsCommand.Execute(null);
+
+    [RelayCommand]
+    private void ManageInterpolationModels() => _owner.ManageInterpolationModelsCommand.Execute(null);
+
     [RelayCommand]
     private Task DeleteAsync() => _owner.DeleteAsync(_rule.Id);
 
@@ -57,10 +227,23 @@ public sealed partial class WatchFolderItemViewModel : ObservableObject
     private void OpenOutput() => _owner.OpenFolder(_rule.OutputDirectory);
 }
 
+public sealed record WatchModelChoice(ModelDescriptor Descriptor, bool IsInstalled) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string Id => Descriptor.Id;
+    public string Name => Descriptor.Name;
+    public string Status => IsInstalled ? "Installed" : "Download required";
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Status)));
+    public override string ToString() => $"{Descriptor.Name} - {Status}";
+}
+
 public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposable
 {
     private readonly IWatchFolderService _watch;
     private readonly ICapabilityRegistry _registry;
+    private readonly IModelManager _models;
+    private readonly IModelPanelService _modelPanel;
     private readonly IFilePickerService _picker;
     private readonly IAppPaths _paths;
     private readonly ISettingsService _settings;
@@ -71,11 +254,14 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
     private bool _disposed;
     private bool _loadingFormats;
 
-    public WatchFoldersViewModel(IWatchFolderService watch, ICapabilityRegistry registry, IFilePickerService picker,
+    public WatchFoldersViewModel(IWatchFolderService watch, ICapabilityRegistry registry, IModelManager models,
+        IModelPanelService modelPanel, IFilePickerService picker,
         IAppPaths paths, ISettingsService settings, INotificationService notifications, IAppLogger logger)
     {
         _watch = watch;
         _registry = registry;
+        _models = models;
+        _modelPanel = modelPanel;
         _picker = picker;
         _paths = paths;
         _settings = settings;
@@ -83,14 +269,71 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         _logger = logger;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _watch.RulesChanged += OnRulesChanged;
+        _models.ModelsChanged += OnModelsChanged;
         InputDirectory = "";
         OutputDirectory = Path.Combine(_paths.DefaultOutputDirectory, "Watched");
         SelectedCategory = Categories[0];
+        _selectedOperation = Operations[0];
         SelectedFormat = null;
-        Task.Run(async () => await RefreshAsync());
+        RefreshModels();
     }
 
+    private void RefreshModels()
+    {
+        var previousImage = SelectedWatchModel?.Id;
+        var previousInterpolation = SelectedWatchInterpolationModel?.Id;
+        var installed = _models.InstalledModels
+            .Where(m => m.IsValid)
+            .Select(m => m.Descriptor.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var images = _models.AvailableModels
+            .Where(m => m.Task is ModelTask.ImageUpscale or ModelTask.ImageRestore && m.SupportsStillImage)
+            .OrderByDescending(m => installed.Contains(m.Id))
+            .ThenBy(m => m.SortOrder)
+            .Select(m => new WatchModelChoice(m, installed.Contains(m.Id)))
+            .ToList();
+        ImageModels.Clear();
+        foreach (var choice in images) ImageModels.Add(choice);
+
+        var interpolation = _models.AvailableModels
+            .Where(m => m.Task == ModelTask.FrameInterpolation && m.SupportsVideoFrames)
+            .OrderByDescending(m => installed.Contains(m.Id))
+            .ThenBy(m => m.SortOrder)
+            .Select(m => new WatchModelChoice(m, installed.Contains(m.Id)))
+            .ToList();
+        InterpolationModels.Clear();
+        foreach (var choice in interpolation) InterpolationModels.Add(choice);
+
+        SelectedWatchModel = ImageModels.FirstOrDefault(c =>
+                              string.Equals(c.Id, previousImage ?? WatchModelId, StringComparison.OrdinalIgnoreCase))
+                          ?? ImageModels.FirstOrDefault();
+        SelectedWatchInterpolationModel = InterpolationModels.FirstOrDefault(c =>
+                                              string.Equals(c.Id, previousInterpolation ?? WatchInterpolationModelId,
+                                                  StringComparison.OrdinalIgnoreCase))
+                                          ?? InterpolationModels.FirstOrDefault();
+    }
+
+    private void OnModelsChanged(object? sender, EventArgs e)
+    {
+        if (_disposed) return;
+        if (!_dispatcher.HasThreadAccess)
+        {
+            _dispatcher.TryEnqueue(() => OnModelsChanged(sender, e));
+            return;
+        }
+        RefreshModels();
+    }
+
+    [RelayCommand]
+    private void ManageImageModels() => _modelPanel.Show(ModelPanelFilter.ImageUpscaling);
+
+    [RelayCommand]
+    private void ManageInterpolationModels() => _modelPanel.Show(ModelPanelFilter.FrameInterpolation);
+
     public ObservableCollection<WatchFolderItemViewModel> Rules { get; } = [];
+    public ObservableCollection<WatchModelChoice> ImageModels { get; } = [];
+    public ObservableCollection<WatchModelChoice> InterpolationModels { get; } = [];
     public ObservableCollection<FormatItemViewModel> Formats { get; } = [];
     public IReadOnlyList<Option<MediaCategory>> Categories { get; } =
     [
@@ -102,21 +345,90 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         new(MediaCategory.Archive, "Archives")
     ];
 
+    public IReadOnlyList<WatchOperationOption> Operations { get; } =
+    [
+        new(OperationKind.ImageConvert, MediaCategory.Image, "Image conversion"),
+        new(OperationKind.AudioConvert, MediaCategory.Audio, "Audio conversion"),
+        new(OperationKind.VideoConvert, MediaCategory.Video, "Video conversion"),
+        new(OperationKind.DocumentConvert, MediaCategory.Document, "Document conversion"),
+        new(OperationKind.EbookConvert, MediaCategory.Ebook, "E-book conversion"),
+        new(OperationKind.ArchiveConvert, MediaCategory.Archive, "Archive conversion"),
+        new(OperationKind.UpscaleTraditional, MediaCategory.Image, "Image upscaling (traditional)"),
+        new(OperationKind.UpscaleAi, MediaCategory.Image, "Image upscaling (AI)"),
+        new(OperationKind.VideoUpscale, MediaCategory.Video, "Video upscaling")
+    ];
+
+    public IReadOnlyList<Option<ExecutionProviderKind>> Providers { get; } =
+    [
+        new(ExecutionProviderKind.Auto, "Automatic"),
+        new(ExecutionProviderKind.Cpu, "CPU"),
+        new(ExecutionProviderKind.DirectML, "DirectML"),
+        new(ExecutionProviderKind.Vulkan, "Vulkan")
+    ];
+
+    public IReadOnlyList<Option<int>> Scales { get; } = [new(2, "2x"), new(3, "3x"), new(4, "4x")];
+
+    public IReadOnlyList<Option<ResamplingAlgorithm>> Algorithms { get; } =
+    [
+        new(ResamplingAlgorithm.NearestNeighbor, "Nearest Neighbor"),
+        new(ResamplingAlgorithm.Bilinear, "Bilinear"),
+        new(ResamplingAlgorithm.Bicubic, "Bicubic"),
+        new(ResamplingAlgorithm.Lanczos, "Lanczos"),
+        new(ResamplingAlgorithm.MitchellNetravali, "Mitchell–Netravali")
+    ];
+
     public IReadOnlyList<Option<int>> AudioBitrates { get; } =
     [
         new(96, "96 kbps"), new(128, "128 kbps"), new(160, "160 kbps"),
         new(192, "192 kbps"), new(256, "256 kbps"), new(320, "320 kbps")
     ];
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in Categories) option.RefreshLocalization();
+        foreach (var option in Operations) option.RefreshLocalization();
+        foreach (var option in Providers) option.RefreshLocalization();
+        foreach (var option in Scales) option.RefreshLocalization();
+        foreach (var option in Algorithms) option.RefreshLocalization();
+        foreach (var option in AudioBitrates) option.RefreshLocalization();
+        foreach (var format in Formats) format.RefreshLocalization();
+        foreach (var rule in Rules) rule.RefreshLocalization();
+        foreach (var model in ImageModels) model.RefreshLocalization();
+        foreach (var model in InterpolationModels) model.RefreshLocalization();
+        SelectedCategory.RefreshLocalization();
+        SelectedOperation?.RefreshLocalization();
+        WatchScale.RefreshLocalization();
+        WatchAlgorithm.RefreshLocalization();
+        WatchProvider.RefreshLocalization();
+        SelectedAudioBitrate.RefreshLocalization();
+        SelectedFormat?.RefreshLocalization();
+        SelectedWatchModel?.RefreshLocalization();
+        SelectedWatchInterpolationModel?.RefreshLocalization();
+    }
+
     [ObservableProperty] private string _ruleName = "Watched folder";
     [ObservableProperty] private string _inputDirectory = "";
     [ObservableProperty] private string _outputDirectory = "";
     [ObservableProperty] private bool _includeSubdirectories = true;
+    [ObservableProperty] private bool _ignorePreviouslyProcessed = true;
     [ObservableProperty] private bool _enableImmediately = true;
     [ObservableProperty] private Option<MediaCategory> _selectedCategory;
+    [ObservableProperty] private WatchOperationOption? _selectedOperation;
+    [ObservableProperty] private string _watchModelId = "realesrgan-x4plus";
+    [ObservableProperty] private string _watchInterpolationModelId = "rife-4.25-lite";
+    [ObservableProperty] private WatchModelChoice? _selectedWatchModel;
+    [ObservableProperty] private WatchModelChoice? _selectedWatchInterpolationModel;
+    [ObservableProperty] private Option<int> _watchScale = new(4, "4x");
+    [ObservableProperty] private Option<ResamplingAlgorithm> _watchAlgorithm =
+        new(ResamplingAlgorithm.Lanczos, "Lanczos");
+    [ObservableProperty] private Option<ExecutionProviderKind> _watchProvider = new(ExecutionProviderKind.Auto, "Automatic");
+    [ObservableProperty] private bool _watchEnableInterpolation;
+    [ObservableProperty] private bool _watchTemporal;
+    [ObservableProperty] private double _watchTemporalStrength = 50;
     [ObservableProperty] private FormatItemViewModel? _selectedFormat;
     [ObservableProperty] private double _imageQuality = 88;
-    [ObservableProperty] private Option<int> _selectedAudioBitrate;
+    [ObservableProperty] private Option<int> _selectedAudioBitrate = new(192, "192 kbps");
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = "Create a rule to watch a folder and queue new files automatically.";
     [ObservableProperty] private bool _hasError;
@@ -126,15 +438,23 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
     public bool IsVideoCategory => SelectedCategory?.Value == MediaCategory.Video;
     public bool IsDocumentCategory => SelectedCategory?.Value is MediaCategory.Document or MediaCategory.Ebook;
     public bool IsArchiveCategory => SelectedCategory?.Value == MediaCategory.Archive;
+    public bool IsUpscaleOperation => SelectedOperation?.Operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional or OperationKind.VideoUpscale;
+    public bool IsVideoUpscale => SelectedOperation?.Operation == OperationKind.VideoUpscale;
+    public bool IsImageUpscale => SelectedOperation?.Operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional;
+    public bool IsAiUpscale => SelectedOperation?.Operation is OperationKind.UpscaleAi or OperationKind.VideoUpscale;
+    public bool IsTraditionalUpscale => SelectedOperation?.Operation == OperationKind.UpscaleTraditional;
+    public bool IsConversionOperation => !IsUpscaleOperation;
     public bool HasRules => Rules.Count > 0;
     public bool HasInputFolder => !string.IsNullOrWhiteSpace(InputDirectory) && Directory.Exists(InputDirectory);
-    public string RunSummary => Rules.Count == 1 ? "1 watch rule" : $"{Rules.Count} watch rules";
+    public string RunSummary => LocalizationService.P("Count.WatchRule", Rules.Count);
 
     public async Task InitializeAsync()
     {
         if (_initialized) return;
         _initialized = true;
         if (!_registry.IsInitialized) await _registry.InitializeAsync();
+        await _models.InitializeAsync();
+        RefreshModels();
         await _watch.InitializeAsync();
         SelectedAudioBitrate = AudioBitrates[3];
         LoadFormats();
@@ -146,9 +466,16 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         if (SelectedCategory is null || !_registry.IsInitialized) return;
         _loadingFormats = true;
         Formats.Clear();
-        foreach (var option in _registry.GetOutputFormats(SelectedCategory.Value))
-            Formats.Add(new FormatItemViewModel(option.Format));
-        SelectedFormat = Formats.FirstOrDefault();
+        if (SelectedOperation?.Operation == OperationKind.VideoUpscale)
+        {
+            SelectedFormat = null;
+        }
+        else
+        {
+            foreach (var option in _registry.GetOutputFormats(SelectedCategory.Value))
+                Formats.Add(new FormatItemViewModel(option.Format));
+            SelectedFormat = Formats.FirstOrDefault();
+        }
         _loadingFormats = false;
         OnPropertyChanged(nameof(SelectedFormat));
     }
@@ -161,9 +488,25 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
             var rules = await _watch.GetRulesAsync();
             void Apply()
             {
-                Rules.Clear();
-                foreach (var rule in rules.OrderBy(r => r.Name))
-                    Rules.Add(new WatchFolderItemViewModel(rule, this));
+                var ordered = rules.OrderBy(r => r.Name).ToList();
+                var targetIds = ordered.Select(r => r.Id).ToHashSet();
+                foreach (var stale in Rules.Where(r => !targetIds.Contains(r.Id)).ToList())
+                    Rules.Remove(stale);
+
+                foreach (var rule in ordered)
+                {
+                    var item = Rules.FirstOrDefault(r => r.Id == rule.Id);
+                    if (item is null) Rules.Add(new WatchFolderItemViewModel(rule, this));
+                    else item.ApplyRule(rule);
+                }
+
+                for (var index = 0; index < ordered.Count; index++)
+                {
+                    var item = Rules.First(r => r.Id == ordered[index].Id);
+                    var current = Rules.IndexOf(item);
+                    if (current != index) Rules.Move(current, index);
+                }
+
                 OnPropertyChanged(nameof(HasRules));
                 OnPropertyChanged(nameof(RunSummary));
             }
@@ -199,9 +542,10 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
     [RelayCommand]
     private async Task AddRuleAsync()
     {
-        if (SelectedCategory is null || SelectedFormat is null)
+        if (SelectedOperation is null ||
+            (SelectedOperation.Operation != OperationKind.VideoUpscale && SelectedFormat is null))
         {
-            await SetErrorAsync("Choose a category and output format.");
+            await SetErrorAsync("Choose an operation and output format.");
             return;
         }
 
@@ -221,15 +565,17 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
                 InputDirectory = InputDirectory,
                 OutputDirectory = OutputDirectory,
                 IncludeSubdirectories = IncludeSubdirectories,
+                IgnorePreviouslyProcessed = IgnorePreviouslyProcessed,
                 IsEnabled = EnableImmediately,
                 Operation = operation,
                 Settings = settings
             };
             await _watch.CreateAsync(rule);
-            StatusMessage = $"Watching {Path.GetFileName(InputDirectory.TrimEnd(Path.DirectorySeparatorChar))} → {Path.GetFileName(OutputDirectory.TrimEnd(Path.DirectorySeparatorChar))}.";
+            StatusMessage = LocalizationService.F("Watching {0} → {1}.",
+                Path.GetFileName(InputDirectory.TrimEnd(Path.DirectorySeparatorChar)),
+                Path.GetFileName(OutputDirectory.TrimEnd(Path.DirectorySeparatorChar)));
             HasError = false;
             _notifications.Notify("Watch rule created", rule.Name, NotificationSeverity.Success);
-            await RefreshAsync();
         }
         catch (Exception ex)
         {
@@ -243,8 +589,42 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
 
     private (OperationKind Operation, OperationSettings Settings) BuildRuleSettings()
     {
-        var category = SelectedCategory!.Value;
-        var format = SelectedFormat!.Id;
+        var operation = SelectedOperation!.Operation;
+        var category = SelectedOperation.Category;
+        var format = SelectedFormat?.Id ?? FormatIds.Auto;
+        if (operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional)
+        {
+            return (operation, new UpscaleSettings
+            {
+                Method = operation == OperationKind.UpscaleAi ? UpscaleMethod.Ai : UpscaleMethod.Traditional,
+                Algorithm = WatchAlgorithm?.Value ?? ResamplingAlgorithm.Lanczos,
+                ModelId = SelectedWatchModel?.Id ?? WatchModelId,
+                ScaleFactor = WatchScale?.Value ?? 4,
+                ExecutionProvider = WatchProvider?.Value ?? ExecutionProviderKind.Auto,
+                OutputFormatId = format,
+                OutputDirectory = OutputDirectory,
+                CollisionPolicy = CollisionPolicy.UniqueName
+            });
+        }
+
+        if (operation == OperationKind.VideoUpscale)
+        {
+            return (operation, new VideoUpscaleSettings
+            {
+                ImageModelId = SelectedWatchModel?.Id ?? WatchModelId,
+                InterpolationModelId = SelectedWatchInterpolationModel?.Id ?? WatchInterpolationModelId,
+                ScaleFactor = WatchScale?.Value ?? 4,
+                EnableSuperResolution = true,
+                EnableInterpolation = WatchEnableInterpolation,
+                FrameRateMultiplier = 2,
+                ExecutionProvider = WatchProvider?.Value ?? ExecutionProviderKind.Auto,
+                EnableTemporalStability = WatchTemporal,
+                TemporalStabilityStrength = (int)Math.Clamp(WatchTemporalStrength, 0, 100),
+                OutputDirectory = OutputDirectory,
+                CollisionPolicy = CollisionPolicy.UniqueName
+            });
+        }
+
         return category switch
         {
             MediaCategory.Image => (OperationKind.ImageConvert, new ImageConversionSettings
@@ -324,6 +704,34 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         };
     }
 
+    public void BeginEdit(WatchFolderItemViewModel item)
+    {
+        foreach (var rule in Rules)
+            if (!ReferenceEquals(rule, item)) rule.IsEditing = false;
+    }
+
+    public void CancelEdit(WatchFolderItemViewModel item)
+    {
+        // Draft values live on the item; leaving edit mode discards them.
+    }
+
+    public async Task<bool> UpdateRuleAsync(WatchFolderRule rule)
+    {
+        try
+        {
+            await _watch.UpdateAsync(rule);
+            StatusMessage = "Watch rule updated.";
+            HasError = false;
+            _notifications.Notify("Watch rule updated", rule.Name, NotificationSeverity.Success);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await SetErrorAsync(ex.Message);
+            return false;
+        }
+    }
+
     public async Task SetEnabledAsync(Guid id, bool enabled)
     {
         try
@@ -334,6 +742,8 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         }
         catch (Exception ex)
         {
+            var item = Rules.FirstOrDefault(r => r.Id == id);
+            item?.SyncEnabled(!enabled);
             await SetErrorAsync(ex.Message);
         }
     }
@@ -344,7 +754,6 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         {
             await _watch.DeleteAsync(id);
             _notifications.Notify("Watch rule removed", "Source files were not deleted.", NotificationSeverity.Info);
-            await RefreshAsync();
         }
         catch (Exception ex)
         {
@@ -356,10 +765,12 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
     {
         try
         {
-            if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = folder, UseShellExecute = true });
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _notifications.Notify("Could not open folder", ex.Message, NotificationSeverity.Warning);
+        }
     }
 
     private async Task SetErrorAsync(string message)
@@ -370,6 +781,19 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
     }
 
     partial void OnInputDirectoryChanged(string value) => OnPropertyChanged(nameof(HasInputFolder));
+    partial void OnSelectedOperationChanged(WatchOperationOption? value)
+    {
+        if (value is null) return;
+        SelectedCategory = Categories.FirstOrDefault(c => c.Value == value.Category) ?? Categories[0];
+        OnPropertyChanged(nameof(IsUpscaleOperation));
+        OnPropertyChanged(nameof(IsVideoUpscale));
+        OnPropertyChanged(nameof(IsImageUpscale));
+        OnPropertyChanged(nameof(IsAiUpscale));
+        OnPropertyChanged(nameof(IsTraditionalUpscale));
+        OnPropertyChanged(nameof(IsConversionOperation));
+        LoadFormats();
+    }
+
     partial void OnSelectedCategoryChanged(Option<MediaCategory> value)
     {
         if (value is null) return;
@@ -386,5 +810,6 @@ public sealed partial class WatchFoldersViewModel : ObservableObject, IDisposabl
         if (_disposed) return;
         _disposed = true;
         _watch.RulesChanged -= OnRulesChanged;
+        _models.ModelsChanged -= OnModelsChanged;
     }
 }

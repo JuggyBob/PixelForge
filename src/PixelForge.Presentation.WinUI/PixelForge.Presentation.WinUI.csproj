@@ -31,6 +31,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Localization\Resources\*.json" />
     <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\third_party\ffmpeg\bin\**\*" Link="ffmpeg\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\third_party\ffmpeg\LICENSE.txt" Link="ffmpeg\LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />

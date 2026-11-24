@@ -385,7 +385,8 @@ public sealed class UpscalingEngine : IProcessingEngine, IModelValidator, IFrame
             var bytes = new FileInfo(request.TempOutputPath).Length;
             if (bytes == 0) return ProcessingResult.Fail("The image encoder produced no output.");
             return ProcessingResult.Ok(request.TempOutputPath, null, bytes, stopwatch.Elapsed,
-                warnings: image.Depth > 8 ? ["The output was reduced to 8 bits per channel."] : []);
+                warnings: image.Depth > 8 ? ["The output was reduced to 8 bits per channel."] : [])
+                with { RequestedProvider = "CPU", ActualProvider = "CPU" };
         }, cancellationToken);
 
         if (!result.Success) return result;
@@ -542,7 +543,18 @@ public sealed class UpscalingEngine : IProcessingEngine, IModelValidator, IFrame
             Issues = verification.Issues.Concat(warnings.Select(w => ValidationIssue.Info("upscale.info", w))).ToList()
         };
         return ProcessingResult.Ok(request.TempOutputPath, verification.ActualInfo, outputBytes, stopwatch.Elapsed,
-            finalVerification, warnings);
+            finalVerification, warnings)
+            with
+            {
+                RequestedProvider = settings.ExecutionProvider.ToString(),
+                ActualProvider = ProviderName(actualProvider),
+                FallbackReason = settings.ExecutionProvider != ExecutionProviderKind.Auto &&
+                                 actualProvider != settings.ExecutionProvider
+                    ? $"Requested {settings.ExecutionProvider}; inference ran on {ProviderName(actualProvider)}."
+                    : null,
+                ModelId = settings.ModelId,
+                RuntimeVersion = "ONNX Runtime"
+            };
     }
 
     private async Task<ProcessingResult> ProcessFixedTileAsync(ProcessingRequest request, UpscaleSettings settings,
@@ -649,7 +661,18 @@ public sealed class UpscalingEngine : IProcessingEngine, IModelValidator, IFrame
             Issues = verification.Issues.Concat(warnings.Select(w => ValidationIssue.Info("upscale.fixedtile", w))).ToList()
         };
         return ProcessingResult.Ok(request.TempOutputPath, verification.ActualInfo, outputBytes, stopwatch.Elapsed,
-            finalVerification, warnings);
+            finalVerification, warnings)
+            with
+            {
+                RequestedProvider = settings.ExecutionProvider.ToString(),
+                ActualProvider = ProviderName(actualProvider),
+                FallbackReason = settings.ExecutionProvider != ExecutionProviderKind.Auto &&
+                                 actualProvider != settings.ExecutionProvider
+                    ? $"Requested {settings.ExecutionProvider}; inference ran on {ProviderName(actualProvider)}."
+                    : null,
+                ModelId = settings.ModelId,
+                RuntimeVersion = "ONNX Runtime"
+            };
     }
 
     private static AiTiledResult RunFixedTileInference(SessionHolder holder, byte[] sourceBgra,
@@ -853,7 +876,17 @@ public sealed class UpscalingEngine : IProcessingEngine, IModelValidator, IFrame
                 Issues = verification.Issues.Concat(warnings.Select(w => ValidationIssue.Info("upscale.ncnn", w))).ToList()
             };
             return ProcessingResult.Ok(request.TempOutputPath, verification.ActualInfo, outputBytes, stopwatch.Elapsed,
-                finalVerification, warnings);
+                finalVerification, warnings)
+                with
+                {
+                    RequestedProvider = settings.ExecutionProvider.ToString(),
+                    ActualProvider = "NCNN/" + providerName,
+                    FallbackReason = settings.ExecutionProvider == ExecutionProviderKind.DirectML
+                        ? "NCNN does not support DirectML; the GPU path ran through Vulkan."
+                        : null,
+                    ModelId = settings.ModelId,
+                    RuntimeVersion = runtime.Descriptor.Version
+                };
         }
         catch (OperationCanceledException)
         {

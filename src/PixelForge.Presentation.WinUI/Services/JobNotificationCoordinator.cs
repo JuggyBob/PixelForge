@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Services;
 
@@ -54,23 +55,28 @@ public sealed class JobNotificationCoordinator
             {
                 case JobState.Completed when job.FailedItems > 0:
                     _notifications.Notify("Batch finished with errors",
-                        $"{job.Title} · {job.BatchSummary ?? $"{job.FailedItems} failed"}", NotificationSeverity.Warning);
+                        LocalizationService.F("{0} · {1}", job.Title,
+                            LocalizationService.LocalizeBatchSummary(job.BatchSummary) is { Length: > 0 } summary
+                                ? summary
+                                : LocalizationService.P("Count.Failed", job.FailedItems)),
+                        NotificationSeverity.Warning);
                     break;
                 case JobState.Completed:
                     _notifications.Notify("Processing complete",
-                        $"{job.Title} · {job.CompletedItems} item{(job.CompletedItems == 1 ? "" : "s")} verified.",
+                        LocalizationService.F("{0} · {1}", job.Title, LocalizationService.F("{0} verified.", LocalizationService.P("Count.Item", job.CompletedItems))),
                         NotificationSeverity.Success);
                     break;
                 case JobState.Failed:
                     _notifications.Notify("Processing failed",
-                        $"{job.Title} · {job.Error ?? "Open the queue for details."}", NotificationSeverity.Error,
+                        LocalizationService.F("{0} · {1}", job.Title, job.Error ?? LocalizationService.T("Open the queue for details.")), NotificationSeverity.Error,
                         autoDismiss: false);
                     break;
                 case JobState.Cancelled:
                     _notifications.Notify("Job cancelled", job.Title, NotificationSeverity.Warning);
                     break;
                 case JobState.Interrupted:
-                    _notifications.Notify("Job interrupted", $"{job.Title} — retry it from the queue.",
+                    _notifications.Notify("Job interrupted",
+                        LocalizationService.F("{0} — retry it from the queue.", job.Title),
                         NotificationSeverity.Warning);
                     break;
             }

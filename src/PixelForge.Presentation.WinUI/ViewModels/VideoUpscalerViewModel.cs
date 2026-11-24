@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
@@ -33,6 +34,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
     private CancellationTokenSource? _previewCts;
     private bool _initialized;
     private bool _disposed;
+    private FolderScanResult? _lastScanResult;
 
     public VideoUpscalerViewModel(ICapabilityRegistry registry, IMediaInspector inspector, IFolderScanner scanner,
         IThumbnailService thumbnails, IFilePickerService filePicker, IJobService jobs, IModelManager models,
@@ -80,8 +82,26 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         new(CollisionPolicy.Overwrite, "Replace existing files", "Overwrite only after confirmation.")
     ];
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in ScaleOptions) option.RefreshLocalization();
+        foreach (var option in FrameRateOptions) option.RefreshLocalization();
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var provider in Providers) provider.RefreshLocalization();
+        foreach (var model in ImageModels) model.RefreshLocalization();
+        foreach (var model in InterpolationModels) model.RefreshLocalization();
+        UpdateModelStatusText();
+        RefreshSummary();
+        if (SelectedProvider is not null) ProviderStatus = SelectedProvider.Detail;
+        if (_lastScanResult is not null && !IsScanning)
+            ScanSummary = LocalizationService.ScanSummary(_lastScanResult);
+    }
+
     [ObservableProperty] private bool _enableSuperResolution = true;
     [ObservableProperty] private bool _enableInterpolation;
+    [ObservableProperty] private bool _enableTemporalStability;
+    [ObservableProperty] private double _temporalStabilityStrength = 50;
     [ObservableProperty] private UpscaleModelItem? _selectedImageModel;
     [ObservableProperty] private UpscaleModelItem? _selectedInterpolationModel;
     [ObservableProperty] private Option<int>? _selectedScale;
@@ -141,6 +161,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
     public async Task AddVideosAsync(IReadOnlyList<string> paths)
     {
         if (paths.Count == 0) return;
+        _lastScanResult = null;
         try
         {
             var files = paths.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -151,7 +172,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             {
                 if (!info.IsReadable || info.Category != MediaCategory.Video)
                 {
-                    _notifications.Notify("Video skipped", $"{info.FileName}: not a readable video.",
+                    _notifications.Notify("Video skipped", LocalizationService.F("{0}: not a readable video.", info.FileName),
                         NotificationSeverity.Warning);
                     continue;
                 }
@@ -173,15 +194,16 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
     public async Task AddFolderAsync(string folder)
     {
         if (IsScanning) return;
+        _lastScanResult = null;
         IsScanning = true;
         HasScanSummary = true;
-        ScanSummary = "Scanning folder…";
+        ScanSummary = Loc.T("Scanning folder…");
         Skipped.Clear();
         HasScanSkipped = false;
         try
         {
             var progress = new Progress<int>(count =>
-                _dispatcher.TryEnqueue(() => ScanSummary = $"Scanning folder… {count} files checked"));
+                _dispatcher.TryEnqueue(() => ScanSummary = LocalizationService.P("Scan.CheckedFiles", count)));
             var result = await _scanner.ScanAsync(new FolderScanRequest
             {
                 FolderPath = folder,
@@ -202,7 +224,8 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             foreach (var file in result.Files.Where(f => !f.IsSupported || !f.IsValid))
                 Skipped.Add(new ScanSkipItem(file.RelativePath, file.Reason ?? "Skipped", !file.IsSupported));
             HasScanSkipped = Skipped.Count > 0;
-            ScanSummary = result.Summary + (result.Warning is null ? "" : " · " + result.Warning);
+            ScanSummary = LocalizationService.ScanSummary(result);
+            _lastScanResult = result;
             HasScanSummary = true;
             RefreshFileState();
             if (added > 0)
@@ -248,6 +271,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         Skipped.Clear();
         HasScanSkipped = false;
         HasScanSummary = false;
+        _lastScanResult = null;
         ScanSummary = "";
         PreviewImage = null;
         ShowPreview = false;
@@ -385,10 +409,11 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             Skipped.Clear();
             HasScanSkipped = false;
             HasScanSummary = false;
+            _lastScanResult = null;
             ScanSummary = "";
             PreviewImage = null;
             ShowPreview = false;
-            JobStatus = "Queued · waiting for processing";
+            JobStatus = Loc.T("Queued · waiting for processing");
             RefreshFileState();
             _navigation.Navigate("Queue");
         }
@@ -410,6 +435,8 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
 
         EnableSuperResolution = defaults.EnableSuperResolution;
         EnableInterpolation = defaults.EnableInterpolation;
+        EnableTemporalStability = defaults.EnableTemporalStability;
+        TemporalStabilityStrength = defaults.TemporalStabilityStrength;
 
         SelectedImageModel = ImageModels.FirstOrDefault(m => m.Id == defaults.ImageModelId)
                              ?? SelectedImageModel
@@ -462,6 +489,8 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             EnableInterpolation = EnableInterpolation,
             InterpolationModelId = SelectedInterpolationModel?.Id ?? "",
             FrameRateMultiplier = SelectedFrameRate?.Value ?? 2,
+            EnableTemporalStability = EnableTemporalStability,
+            TemporalStabilityStrength = (int)Math.Clamp(TemporalStabilityStrength, 0, 100),
             ExecutionProvider = SelectedProvider?.Kind ?? ExecutionProviderKind.Auto,
             TileSize = 0,
             TileOverlap = 0
@@ -469,7 +498,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         return new JobRequest
         {
             Operation = OperationKind.VideoUpscale,
-            Title = $"Video upscale {Files.Count} video{(Files.Count == 1 ? "" : "s")}",
+            Title = LocalizationService.F("Video upscale {0}", LocalizationService.P("Count.Video", Files.Count)),
             Settings = settings,
             Inputs = Files.Select(f => new JobInput
             {
@@ -530,28 +559,13 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
 
     private void RefreshModelStatus()
     {
-        if (SelectedImageModel is null)
-        {
-            ImageModelStatus = "No image upscaling model is installed. Open Manage to download one.";
-        }
-        else
-        {
-            ImageModelStatus = SelectedImageModel.IsInstalled
-                ? $"{SelectedImageModel.Name} · {SelectedImageModel.ScaleText} · installed"
-                : $"{SelectedImageModel.Name} · download required before queueing";
-        }
-
-        InterpolationModelStatus = SelectedInterpolationModel is null
-            ? "No frame interpolation model is installed. Open Manage to download RIFE."
-            : SelectedInterpolationModel.IsInstalled
-                ? $"{SelectedInterpolationModel.Name} · installed"
-                : $"{SelectedInterpolationModel.Name} · download required before queueing";
+        UpdateModelStatusText();
 
         var scaleOptions = new List<Option<int>>();
         if (SelectedImageModel is not null)
         {
             var native = SelectedImageModel.Descriptor.ScaleFactor;
-            scaleOptions.Add(new Option<int>(native, $"{native}× (native)"));
+            scaleOptions.Add(new Option<int>(native, Loc.F("{0}× (native)", native)));
         }
         var previousScale = SelectedScale?.Value;
         ScaleOptions.Clear();
@@ -563,8 +577,29 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         UpdateCanQueue();
     }
 
+    private void UpdateModelStatusText()
+    {
+        if (SelectedImageModel is null)
+        {
+            ImageModelStatus = Loc.T("No image upscaling model is installed. Open Manage to download one.");
+        }
+        else
+        {
+            ImageModelStatus = SelectedImageModel.IsInstalled
+                ? Loc.F("{0} · {1} · installed", SelectedImageModel.Name, SelectedImageModel.ScaleText)
+                : Loc.F("{0} · download required before queueing", SelectedImageModel.Name);
+        }
+
+        InterpolationModelStatus = SelectedInterpolationModel is null
+            ? Loc.T("No frame interpolation model is installed. Open Manage to download RIFE.")
+            : SelectedInterpolationModel.IsInstalled
+                ? Loc.F("{0} · installed", SelectedInterpolationModel.Name)
+                : Loc.F("{0} · download required before queueing", SelectedInterpolationModel.Name);
+    }
+
     public bool ShowImageSettings => EnableSuperResolution;
     public bool ShowInterpolationSettings => EnableInterpolation;
+    public bool ShowTemporalSettings => EnableSuperResolution || EnableInterpolation;
 
     private void RefreshFileState()
     {
@@ -603,7 +638,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
                 ShowPreview = false;
-                PreviewStatus = "Preview frame unavailable.";
+                PreviewStatus = Loc.T("Preview frame unavailable.");
                 return;
             }
 
@@ -621,7 +656,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         {
             _logger.LogWarning("Video preview failed: {Message}", ex.Message);
             ShowPreview = false;
-            PreviewStatus = "Preview frame unavailable.";
+            PreviewStatus = Loc.T("Preview frame unavailable.");
         }
     }
 
@@ -629,17 +664,17 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
     {
         if (Files.Count == 0)
         {
-            Summary = "Add a video to begin";
+            Summary = Loc.T("Add a video to begin");
             ExpectedOutput = "";
             return;
         }
 
         var operations = new List<string>();
         if (EnableSuperResolution && SelectedImageModel is not null)
-            operations.Add($"AI {SelectedImageModel.ScaleText}");
+            operations.Add(Loc.F("AI {0}", SelectedImageModel.ScaleText));
         if (EnableInterpolation)
-            operations.Add($"{SelectedFrameRate?.Value ?? 2}× frame interpolation");
-        if (operations.Count == 0) operations.Add("No operation enabled");
+            operations.Add(Loc.F("{0}× frame interpolation", SelectedFrameRate?.Value ?? 2));
+        if (operations.Count == 0) operations.Add(Loc.T("No operation enabled"));
 
         var first = Files[0].Info;
         var scale = EnableSuperResolution ? SelectedImageModel?.Descriptor.ScaleFactor ?? 4 : 1;
@@ -649,8 +684,8 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         ExpectedOutput = width > 0 && height > 0
             ? $"{width} × {height} · {fps:0.##} fps"
             : $"{fps:0.##} fps";
-        Summary = $"{Files.Count} video{(Files.Count == 1 ? "" : "s")} · {string.Join(" + ", operations)}";
-        StatusText = $"{operations[0]} · {ExpectedOutput}";
+        Summary = Loc.F("{0} · {1}", Loc.P("Count.Video", Files.Count), string.Join(" + ", operations));
+        StatusText = Loc.F("{0} · {1}", operations[0], ExpectedOutput);
     }
 
     private void UpdateCanQueue()
@@ -709,7 +744,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         {
             HasValidationErrors = validation.Errors.Count > 0;
             HasValidationWarnings = validation.Warnings.Count > 0;
-            ValidationSummary = validation.Summary;
+            ValidationSummary = LocalizationService.ValidationSummary(validation);
         }
         UpdateCanQueue();
     }
@@ -742,7 +777,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
 
         if (!e.Job.IsTerminal)
         {
-            JobStatus = $"{e.Job.StateText} · {e.Job.Progress:P0}";
+            JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T(e.Job.StateText), e.Job.Progress.ToString("P0", LocalizationService.CurrentCulture));
             return;
         }
 
@@ -752,12 +787,12 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             LastInputPath = item.InputPath;
             LastOutputPath = item.OutputPath;
             CanCompare = true;
-            JobStatus = $"Completed · {item.VerificationSummary ?? Path.GetFileName(item.OutputPath)}";
+            JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T("Completed"), item.VerificationSummary ?? Path.GetFileName(item.OutputPath));
             _ = RefreshCompletedPreviewAsync(item.OutputPath);
         }
         else
         {
-            JobStatus = $"{e.Job.StateText} · {e.Job.Error ?? item?.Error ?? "The video job did not complete."}";
+            JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T(e.Job.StateText), e.Job.Error ?? item?.Error ?? LocalizationService.T("The video job did not complete."));
         }
     }
 
@@ -769,7 +804,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         {
             PreviewImage = new BitmapImage { UriSource = new Uri(path) };
             ShowPreview = true;
-            PreviewStatus = "Last output frame";
+            PreviewStatus = Loc.T("Last output frame");
         }
         else
         {
@@ -777,7 +812,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
             {
                 PreviewImage = new BitmapImage { UriSource = new Uri(path) };
                 ShowPreview = true;
-                PreviewStatus = "Last output frame";
+                PreviewStatus = Loc.T("Last output frame");
             });
         }
     }
@@ -785,6 +820,7 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
     partial void OnEnableSuperResolutionChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowImageSettings));
+        OnPropertyChanged(nameof(ShowTemporalSettings));
         RefreshSummary();
         UpdateCanQueue();
         ScheduleValidation();
@@ -797,6 +833,14 @@ public sealed partial class VideoUpscalerViewModel : ObservableObject, IDisposab
         UpdateCanQueue();
         ScheduleValidation();
     }
+
+    partial void OnEnableTemporalStabilityChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowTemporalSettings));
+        ScheduleValidation();
+    }
+
+    partial void OnTemporalStabilityStrengthChanged(double value) => ScheduleValidation();
 
     partial void OnSelectedImageModelChanged(UpscaleModelItem? value)
     {

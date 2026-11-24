@@ -25,6 +25,7 @@ public sealed class NavigationService : INavigationService
     {
         ["Home"] = typeof(HomePage),
         ["Converter"] = typeof(ConverterPage),
+        ["Pipelines"] = typeof(PipelinesPage),
         ["Tools"] = typeof(ToolsPage),
         ["Watch"] = typeof(WatchFoldersPage),
         ["Upscaler"] = typeof(UpscalerPage),

@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Views.ComparePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     xmlns:controls="using:PixelForge.Presentation.Controls"
     Background="Transparent">
 
@@ -20,23 +21,23 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Button Style="{StaticResource IconButtonStyle}" Click="OnBackClick" VerticalAlignment="Top" Margin="0,2,10,0"
-                    AutomationProperties.Name="Back">
+                    loc:Loc.AutomationName="Back">
                 <FontIcon Glyph="&#xE72B;" FontSize="14" />
             </Button>
             <StackPanel Grid.Column="1" Spacing="2">
-                <TextBlock x:Name="TitleText" Text="Before / after" Style="{StaticResource PageTitleTextStyle}" />
-                <TextBlock x:Name="SubtitleText" Text="Inspect the original and the verified output at full resolution."
+                <TextBlock x:Name="TitleText" loc:Loc.Text="Before / after" Style="{StaticResource PageTitleTextStyle}" />
+                <TextBlock x:Name="SubtitleText" loc:Loc.Text="Inspect the original and the verified output at full resolution."
                            Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Button Content="Fit" Style="{StaticResource SecondaryButtonStyle}" Click="OnFitClick" ToolTipService.ToolTip="Fit to window" />
-                <Button Content="100%" Style="{StaticResource SecondaryButtonStyle}" Click="OnActualSizeClick" ToolTipService.ToolTip="Full-resolution inspection" />
-                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomOutClick" ToolTipService.ToolTip="Zoom out"
-                        AutomationProperties.Name="Zoom out">
+                <Button loc:Loc.Content="Fit" Style="{StaticResource SecondaryButtonStyle}" Click="OnFitClick" loc:Loc.ToolTip="Fit to window" />
+                <Button Content="100%" Style="{StaticResource SecondaryButtonStyle}" Click="OnActualSizeClick" loc:Loc.ToolTip="Full-resolution inspection" />
+                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomOutClick" loc:Loc.ToolTip="Zoom out"
+                        loc:Loc.AutomationName="Zoom out">
                     <FontIcon Glyph="&#xE71F;" FontSize="14" />
                 </Button>
-                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomInClick" ToolTipService.ToolTip="Zoom in"
-                        AutomationProperties.Name="Zoom in">
+                <Button Style="{StaticResource IconButtonStyle}" Click="OnZoomInClick" loc:Loc.ToolTip="Zoom in"
+                        loc:Loc.AutomationName="Zoom in">
                     <FontIcon Glyph="&#xE710;" FontSize="14" />
                 </Button>
             </StackPanel>
@@ -54,23 +55,23 @@
             </Grid.ColumnDefinitions>
             <Border Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Original" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock loc:Loc.Text="Original" Style="{StaticResource CaptionTextStyle}" />
                     <TextBlock x:Name="OriginalNameText" Text="—" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="OriginalMetaText" Text="—" Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Upscaled output" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock loc:Loc.Text="Upscaled output" Style="{StaticResource CaptionTextStyle}" />
                     <TextBlock x:Name="OutputNameText" Text="—" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <TextBlock x:Name="OutputMetaText" Text="—" Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Inspection" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock loc:Loc.Text="Inspection" Style="{StaticResource CaptionTextStyle}" />
                     <TextBlock x:Name="ScaleText" Text="—" FontSize="13" FontWeight="SemiBold" />
-                    <TextBlock Text="Drag the divider · wheel to zoom · drag the image to pan"
+                    <TextBlock loc:Loc.Text="Drag the divider · wheel to zoom · drag the image to pan"
                                Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>

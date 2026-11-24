@@ -141,6 +141,11 @@ public sealed class VideoUpscaleSettings : OperationSettings
     public int TileSize { get; set; }
     public int TileOverlap { get; set; }
 
+    /// <summary>Optional motion-adaptive temporal stabilization after frame upscaling.</summary>
+    public bool EnableTemporalStability { get; set; }
+    /// <summary>0-100; higher blends more aggressively in low-motion regions.</summary>
+    public int TemporalStabilityStrength { get; set; } = 50;
+
     public override OperationSettings Clone() => (VideoUpscaleSettings)MemberwiseClone();
 }
 
@@ -153,6 +158,10 @@ public sealed class OcrSettings : OperationSettings
     public string DocumentName { get; set; } = "ScannedDocument_OCR";
     public bool Preprocess { get; set; } = true;
     public bool PreserveReadingOrder { get; set; } = true;
+    public bool ReviewBeforeExport { get; set; }
+    public string? ReviewedMarkdownPath { get; set; }
+    public string? ReviewedProvider { get; set; }
+    public string? ReviewedRuntimeVersion { get; set; }
     public ExecutionProviderKind ExecutionProvider { get; set; } = ExecutionProviderKind.Auto;
     public IReadOnlyList<string> PagePaths { get; set; } = [];
 

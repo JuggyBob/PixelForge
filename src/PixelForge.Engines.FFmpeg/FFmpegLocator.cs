@@ -34,10 +34,6 @@ public sealed class FFmpegLocator
             candidates.Add(Path.Combine(current.FullName, "third_party", "ffmpeg", "bin"));
         }
 
-        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
-        foreach (var part in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-            candidates.Add(part);
-
         foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             var ffmpeg = Path.Combine(candidate, "ffmpeg.exe");

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.ViewModels;
 using Windows.System;
 
@@ -15,7 +16,22 @@ public sealed partial class FormatPicker : UserControl
     {
         InitializeComponent();
         FormatList.ItemsSource = _filtered;
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
     }
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        LocalizationService.LanguageChanged -= OnLanguageChanged;
+        LocalizationService.LanguageChanged += OnLanguageChanged;
+        UpdateDisplay();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) =>
+        LocalizationService.LanguageChanged -= OnLanguageChanged;
+
+    private void OnLanguageChanged(object? sender, EventArgs e) =>
+        DispatcherQueue.TryEnqueue(UpdateDisplay);
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
         nameof(ItemsSource), typeof(IEnumerable<FormatItemViewModel>), typeof(FormatPicker),
@@ -68,16 +84,16 @@ public sealed partial class FormatPicker : UserControl
         if (item is null)
         {
             ExtensionText.Text = "—";
-            NameText.Text = "Choose a format";
-            HintText.Text = "Searchable format catalogue";
+            NameText.Text = Loc.T("Choose a format");
+            HintText.Text = Loc.T("Searchable format catalogue");
             return;
         }
 
         ExtensionText.Text = item.ExtensionUpper;
-        NameText.Text = item.DisplayName;
+        NameText.Text = Loc.T(item.DisplayName);
         HintText.Text = string.IsNullOrWhiteSpace(item.Badges)
-            ? $"{item.Extension} · {item.CategoryText}"
-            : $"{item.Extension} · {item.Badges}";
+            ? Loc.F("{0} · {1}", item.Extension, item.CategoryText)
+            : Loc.F("{0} · {1}", item.Extension, item.Badges);
     }
 
     private void RefreshFilter()

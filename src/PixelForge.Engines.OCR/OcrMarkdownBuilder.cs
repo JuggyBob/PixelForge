@@ -298,6 +298,7 @@ internal static class OcrMarkdownBuilder
 
     private static string Escape(string text) =>
         text.Replace("\\", "\\\\")
+            .Replace("`", "\\`")
             .Replace("|", "\\|")
             .Replace("*", "\\*")
             .Replace("_", "\\_")

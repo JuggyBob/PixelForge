@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PixelForge.Domain;
@@ -203,7 +204,11 @@ public sealed class JobService : IJobService
             OutputDirectory = settings.OutputDirectory,
             SourcePath = request.SourcePath,
             PreserveRelativePaths = request.PreserveRelativePaths,
-            BatchSummary = request.BatchSummary
+            BatchSummary = request.BatchSummary,
+            PipelineId = request.PipelineId,
+            PipelineName = request.PipelineName,
+            PipelineStep = request.PipelineStep,
+            PipelineStepCount = request.PipelineStepCount
         };
 
         var sort = 0;
@@ -217,6 +222,7 @@ public sealed class JobService : IJobService
                 InputPath = Path.GetFullPath(input.Path),
                 FileName = request.Settings is OcrSettings ocr ? ocr.DocumentName : Path.GetFileName(input.Path),
                 RelativeDirectory = input.RelativeDirectory,
+                PreferredOutputName = input.PreferredOutputName,
                 InputBytes = file.Exists ? file.Length : 0,
                 InputInfo = input.Info,
                 IsBatchChild = false,
@@ -235,6 +241,7 @@ public sealed class JobService : IJobService
                     InputPath = Path.GetFullPath(input.Path),
                     FileName = Path.GetFileName(input.Path),
                     RelativeDirectory = input.RelativeDirectory,
+                    PreferredOutputName = input.PreferredOutputName,
                     InputBytes = file is { Exists: true } ? file.Length : 0,
                     InputInfo = input.Info,
                     IsBatchChild = request.Inputs.Count > 1,
@@ -265,6 +272,13 @@ public sealed class JobService : IJobService
 
         if (_jobCancellation.TryGetValue(jobId, out var cts))
         {
+            foreach (var item in job.Items.Where(i => i.State is JobItemState.Pending or JobItemState.Running))
+            {
+                item.Message = "Cancelling…";
+            }
+
+            RaiseJobChanged(job, JobChangeKind.Updated);
+            RaiseQueueChanged();
             try { cts.Cancel(); } catch { }
             _logger.LogInformation("Cancellation requested for job {JobId}", jobId);
             return;
@@ -540,11 +554,37 @@ public sealed class JobService : IJobService
         var started = Stopwatch.StartNew();
         try
         {
+            // Close the race between the dispatcher's Pending check and CTS
+            // registration: a CancelAsync call in that window marks the job
+            // cancelled without a token to signal.
+            if (cts.IsCancellationRequested || job.State != JobState.Pending)
+            {
+                job.State = _shuttingDown ? JobState.Interrupted : JobState.Cancelled;
+                job.CompletedAt = DateTimeOffset.Now;
+                if (_shuttingDown)
+                    job.Error = "The application closed before the job completed.";
+                else if (string.IsNullOrEmpty(job.Error))
+                    job.Error = "Cancelled by the user.";
+                foreach (var item in job.Items.Where(i => i.State is JobItemState.Pending or JobItemState.Running))
+                {
+                    item.State = JobItemState.Cancelled;
+                    item.Progress = 1;
+                    item.CompletedAt ??= DateTimeOffset.Now;
+                    item.Message = job.Error;
+                }
+
+                await TrySaveJobAsync(job);
+                RaiseJobChanged(job, JobChangeKind.Updated);
+                RaiseQueueChanged();
+                return;
+            }
+
             job.State = JobState.Preparing;
             job.StartedAt = DateTimeOffset.Now;
             job.Error = null;
             job.ErrorDetails = null;
             await TrySaveJobAsync(job);
+            cts.Token.ThrowIfCancellationRequested();
             RaiseJobChanged(job, JobChangeKind.Updated);
             RaiseQueueChanged();
 
@@ -713,6 +753,7 @@ public sealed class JobService : IJobService
         item.CompletedAt = null;
         item.Error = null;
         item.ErrorDetails = null;
+        item.AdditionalOutputPaths.Clear();
         item.Message = "Preparing…";
         item.Attempt++;
         RaiseJobChanged(job, JobChangeKind.Updated);
@@ -726,6 +767,7 @@ public sealed class JobService : IJobService
             var resolution = ResolveOutputFormat(job, item);
             if (resolution.Error is not null)
                 throw new InvalidOperationException(resolution.Error);
+            cancellationToken.ThrowIfCancellationRequested();
             var outputFormatId = resolution.FormatId
                 ?? throw new InvalidOperationException("The output format could not be resolved.");
             var outputExtension = isDirectoryOutput
@@ -736,11 +778,30 @@ public sealed class JobService : IJobService
             if (isDirectoryOutput)
             {
                 var suffix = _fileNames.BuildDefaultSuffix(job.Settings);
-                var baseName = _fileNames.SanitizeFileName(Path.GetFileNameWithoutExtension(item.InputPath)) + suffix;
-                var parent = string.IsNullOrWhiteSpace(item.RelativeDirectory)
-                    ? job.OutputDirectory
-                    : Path.Combine(job.OutputDirectory, item.RelativeDirectory);
+                var baseName = _fileNames.SanitizeFileName(Path.GetFileNameWithoutExtension(
+                    item.PreferredOutputName ?? item.InputPath)) + suffix;
+                var parent = job.OutputDirectory;
+                if (!string.IsNullOrWhiteSpace(item.RelativeDirectory))
+                {
+                    var invalid = Path.GetInvalidFileNameChars();
+                    var parts = item.RelativeDirectory
+                        .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+                        .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries)
+                        .Where(part => part is not "." and not "..")
+                        .Select(part => new string(part
+                            .Where(ch => ch >= 32 && Array.IndexOf(invalid, ch) < 0).ToArray()).Trim())
+                        .Where(part => part.Length > 0)
+                        .ToArray();
+                    if (parts.Length > 0)
+                        parent = Path.Combine(job.OutputDirectory, Path.Combine(parts));
+                }
+
+                if (!_outputPaths.IsPathInside(parent, job.OutputDirectory))
+                    parent = job.OutputDirectory;
+
                 var desired = Path.Combine(parent, baseName);
+                if (!_outputPaths.IsPathInside(desired, job.OutputDirectory))
+                    desired = Path.Combine(job.OutputDirectory, baseName);
                 string? directoryNote = null;
                 if (job.Settings.CollisionPolicy == CollisionPolicy.Skip && Directory.Exists(desired))
                 {
@@ -764,14 +825,17 @@ public sealed class JobService : IJobService
             {
                 if (job.Operation == OperationKind.OcrDocument && job.Settings is OcrSettings ocr)
                 {
-                    var baseName = _fileNames.SanitizeFileName(ocr.DocumentName);
+                    var documentName = string.IsNullOrWhiteSpace(ocr.DocumentName)
+                        ? item.PreferredOutputName ?? Path.GetFileNameWithoutExtension(item.InputPath)
+                        : ocr.DocumentName;
+                    var baseName = _fileNames.SanitizeFileName(documentName);
                     finalPath = Path.Combine(job.OutputDirectory, baseName + ".docx");
                 }
                 else
                 {
                     finalPath = _outputPaths.BuildOutputPath(item.InputPath, job.OutputDirectory, outputExtension,
                         _fileNames.BuildDefaultSuffix(job.Settings), item.RelativeDirectory, job.Settings.CollisionPolicy,
-                        out var adjustmentNote);
+                        out var adjustmentNote, item.PreferredOutputName);
                     if (!string.IsNullOrWhiteSpace(adjustmentNote)) item.Message = adjustmentNote;
                 }
 
@@ -829,7 +893,11 @@ public sealed class JobService : IJobService
                 }
             });
 
+            cancellationToken.ThrowIfCancellationRequested();
+            job.State = JobState.Running;
             item.Message = "Processing…";
+            RaiseJobChanged(job, JobChangeKind.Updated);
+            RaiseQueueChanged();
             var result = await engine.ProcessAsync(request, progress, cancellationToken);
 
             if (cancellationToken.IsCancellationRequested)
@@ -840,6 +908,13 @@ public sealed class JobService : IJobService
                 item.State = JobItemState.Failed;
                 item.Error = result.Error ?? "The engine reported a failure.";
                 item.ErrorDetails = result.ErrorDetails ?? result.EngineLog;
+                item.ErrorCategory = result.ErrorCategory;
+                item.EngineLog = result.EngineLog;
+                item.RequestedProvider = result.RequestedProvider;
+                item.ActualProvider = result.ActualProvider;
+                item.FallbackReason = result.FallbackReason;
+                item.RuntimeVersion = result.RuntimeVersion;
+                item.ModelId = result.ModelId;
                 item.CompletedAt = DateTimeOffset.Now;
                 item.Progress = 1;
                 item.Message = "Failed";
@@ -998,6 +1073,7 @@ public sealed class JobService : IJobService
                 try
                 {
                     File.Move(additional, desired, overwrite: job.Settings.CollisionPolicy == CollisionPolicy.Overwrite);
+                    item.AdditionalOutputPaths.Add(desired);
                     additionalWarnings.Add("Also generated: " + desired);
                 }
                 catch (Exception ex)
@@ -1026,6 +1102,12 @@ public sealed class JobService : IJobService
             item.OutputFormatId = outputFormatId;
             item.VerificationSummary = verification.Summary;
             item.Warnings = result.Warnings.Concat(additionalWarnings).ToList();
+            item.EngineLog = result.EngineLog;
+            item.RequestedProvider = result.RequestedProvider;
+            item.ActualProvider = result.ActualProvider;
+            item.FallbackReason = result.FallbackReason;
+            item.RuntimeVersion = result.RuntimeVersion;
+            item.ModelId = result.ModelId;
             item.CompletedAt = DateTimeOffset.Now;
             item.Duration = itemStopwatch.Elapsed;
             item.Message = "Done";
@@ -1239,8 +1321,21 @@ public sealed class JobService : IJobService
                 DurationMs = item.Duration?.TotalMilliseconds ?? 0,
                 Status = status,
                 Error = item.Error ?? item.SkipReason,
+                ErrorDetails = item.ErrorDetails,
+                ErrorCategory = item.ErrorCategory,
+                EngineLog = item.EngineLog,
+                WarningsJson = item.Warnings.Count == 0 ? null : JsonSerializer.Serialize(item.Warnings),
+                RequestedProvider = item.RequestedProvider,
+                ActualProvider = item.ActualProvider,
+                FallbackReason = item.FallbackReason,
+                RuntimeVersion = item.RuntimeVersion,
+                ModelId = item.ModelId,
                 CreatedAt = DateTimeOffset.Now,
-                VerificationSummary = item.VerificationSummary
+                VerificationSummary = item.VerificationSummary,
+                PipelineId = job.PipelineId,
+                PipelineName = job.PipelineName,
+                PipelineStep = job.PipelineStep,
+                PipelineStepCount = job.PipelineStepCount
             };
             _ = _historyRepository.AddAsync(entry).ContinueWith(t =>
             {

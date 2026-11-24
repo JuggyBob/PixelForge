@@ -29,11 +29,11 @@ function Download([string]$url, [string]$destination, [string]$sha256) {
 
 if ($Force -or -not (Test-Path (Join-Path $ffmpegBin "ffmpeg.exe"))) {
     if ($Force -or -not (Test-Path $ffmpegZip)) {
-        Download "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-lgpl-shared-9.0.zip" `
-            $ffmpegZip "2561C6F8216E510B236BCA914E5EFB5445E61167C72213251E814DD6FFBBE221"
+        Download "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-24-12-41/ffmpeg-n9.0.2-963-g4d831360c9-win64-lgpl-shared-9.0.zip" `
+            $ffmpegZip "471961BA38074215FFB4E94E3D90EAD94886D59E67B24B7BF057D6B80ADF9FE0"
     } else {
         $actual = (Get-FileHash $ffmpegZip -Algorithm SHA256).Hash
-        if ($actual -ne "2561C6F8216E510B236BCA914E5EFB5445E61167C72213251E814DD6FFBBE221") {
+        if ($actual -ne "471961BA38074215FFB4E94E3D90EAD94886D59E67B24B7BF057D6B80ADF9FE0") {
             Write-Warning "The existing FFmpeg ZIP has a different hash than the verified development build. It will be used as-is."
         }
     }

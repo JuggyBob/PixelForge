@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Views.QueuePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     Background="Transparent">
 
     <Grid Padding="28,22,28,24" RowSpacing="16">
@@ -18,16 +19,17 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
-                <TextBlock Text="Processing Queue" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="QueueTitle" />
-                <TextBlock Text="Every conversion and upscale runs locally through one verified queue."
+                <TextBlock loc:Loc.Text="Processing Queue" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="QueueTitle" />
+                <TextBlock loc:Loc.Text="Every conversion and upscale runs locally through one verified queue."
                            Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <ComboBox ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
-                          DisplayMemberPath="Label" MinWidth="140" AutomationProperties.Name="Queue filter" />
-                <Button Content="Clear finished" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearTerminalCommand}"
+                          DisplayMemberPath="DisplayLabel" MinWidth="140" Height="34" VerticalAlignment="Center"
+                          loc:Loc.AutomationName="Queue filter" />
+                <Button loc:Loc.Content="Clear finished" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearTerminalCommand}"
                         AutomationProperties.AutomationId="QueueClearFinished" />
-                <Button Content="History" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding OpenHistoryCommand}"
+                <Button loc:Loc.Content="History" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding OpenHistoryCommand}"
                         AutomationProperties.AutomationId="QueueOpenHistory" />
             </StackPanel>
         </Grid>
@@ -41,26 +43,26 @@
             </Grid.ColumnDefinitions>
             <Border Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Active" Style="{StaticResource CaptionTextStyle}" />
-                    <TextBlock Text="{Binding ActiveCount}" Style="{StaticResource MetricTextStyle}" />
+                    <TextBlock loc:Loc.Text="Active" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding ActiveCount, Converter={StaticResource Localize}}" Style="{StaticResource MetricTextStyle}" />
                 </StackPanel>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Completed" Style="{StaticResource CaptionTextStyle}" />
-                    <TextBlock Text="{Binding CompletedCount}" Style="{StaticResource MetricTextStyle}" />
+                    <TextBlock loc:Loc.Text="Completed" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding CompletedCount, Converter={StaticResource Localize}}" Style="{StaticResource MetricTextStyle}" />
                 </StackPanel>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Failed" Style="{StaticResource CaptionTextStyle}" />
-                    <TextBlock Text="{Binding FailedCount}" Style="{StaticResource MetricTextStyle}" Foreground="{ThemeResource DangerBrush}" />
+                    <TextBlock loc:Loc.Text="Failed" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding FailedCount, Converter={StaticResource Localize}}" Style="{StaticResource MetricTextStyle}" Foreground="{ThemeResource DangerBrush}" />
                 </StackPanel>
             </Border>
             <Border Grid.Column="3" Style="{StaticResource InsetCardStyle}" Padding="14,10">
                 <StackPanel Spacing="2">
-                    <TextBlock Text="Filter" Style="{StaticResource CaptionTextStyle}" />
-                    <TextBlock Text="{Binding SelectedFilter.Label}" Style="{StaticResource CardTitleTextStyle}" FontSize="14" />
+                    <TextBlock loc:Loc.Text="Filter" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock Text="{Binding SelectedFilter.Label, Converter={StaticResource Localize}}" Style="{StaticResource CardTitleTextStyle}" FontSize="14" />
                 </StackPanel>
             </Border>
         </Grid>
@@ -71,9 +73,9 @@
                     <Border Background="{ThemeResource SubtleSurfaceBrush}" Width="64" Height="64" CornerRadius="16" HorizontalAlignment="Center">
                         <FontIcon Glyph="&#xE8FD;" FontSize="28" />
                     </Border>
-                    <TextBlock Text="Nothing queued" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding EmptyMessage}" Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
-                    <Button Content="Open converter" Style="{StaticResource SecondaryButtonStyle}" Click="OnOpenConverterClick"
+                    <TextBlock loc:Loc.Text="Nothing queued" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding EmptyMessage, Converter={StaticResource Localize}}" Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
+                    <Button loc:Loc.Content="Open converter" Style="{StaticResource SecondaryButtonStyle}" Click="OnOpenConverterClick"
                             HorizontalAlignment="Center" />
                 </StackPanel>
             </Border>
@@ -112,13 +114,13 @@
                                         <FontIcon Glyph="{Binding IconGlyph}" FontSize="18" />
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Title, Converter={StaticResource Localize}}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                         <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="{Binding OperationText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding OperationText, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                            <TextBlock Text="{Binding CreatedText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding CreatedText, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                            <TextBlock Text="{Binding ItemCountText}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{Binding ItemCountText, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
                                     </StackPanel>
                                     <Border Grid.Column="2" Style="{StaticResource StatusPillStyle}" Background="{ThemeResource SubtleSurfaceBrush}">
@@ -130,31 +132,43 @@
                                                 <Ellipse Fill="{ThemeResource WarningBrush}" Visibility="{Binding IsInterrupted, Converter={StaticResource BoolToVisibility}}" />
                                                 <Ellipse Fill="{ThemeResource TextFillColorTertiaryBrush}" Visibility="{Binding IsCancelled, Converter={StaticResource BoolToVisibility}}" />
                                             </Grid>
-                                            <TextBlock Text="{Binding StateText}" FontSize="11" />
+                                            <TextBlock Text="{Binding StateText, Converter={StaticResource Localize}}" FontSize="11" />
                                         </StackPanel>
                                     </Border>
                                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
-                                                ToolTipService.ToolTip="Open output folder" AutomationProperties.Name="Open output folder">
+                                                loc:Loc.ToolTip="Open output folder" loc:Loc.AutomationName="Open output folder">
                                             <FontIcon Glyph="&#xE8B7;" FontSize="13" />
                                         </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ViewReportCommand}"
+                                                loc:Loc.ToolTip="View diagnostic report" loc:Loc.AutomationName="View diagnostic report">
+                                            <FontIcon Glyph="&#xE890;" FontSize="12" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CopyReportCommand}"
+                                                loc:Loc.ToolTip="Copy diagnostic report" loc:Loc.AutomationName="Copy diagnostic report">
+                                            <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding SaveReportCommand}"
+                                                loc:Loc.ToolTip="Save diagnostic report" loc:Loc.AutomationName="Save diagnostic report">
+                                            <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                        </Button>
                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ToggleDetailsCommand}"
-                                                ToolTipService.ToolTip="Show items" AutomationProperties.Name="Show job items">
+                                                loc:Loc.ToolTip="Show items" loc:Loc.AutomationName="Show job items">
                                             <FontIcon Glyph="&#xE70D;" FontSize="12" />
                                         </Button>
                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CancelCommand}"
                                                 Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibility}}"
-                                                ToolTipService.ToolTip="Cancel job" AutomationProperties.Name="Cancel job">
+                                                loc:Loc.ToolTip="Cancel job" loc:Loc.AutomationName="Cancel job">
                                             <FontIcon Glyph="&#xE711;" FontSize="13" />
                                         </Button>
                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RetryCommand}"
                                                 Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
-                                                ToolTipService.ToolTip="Retry failed items" AutomationProperties.Name="Retry failed items">
+                                                loc:Loc.ToolTip="Retry failed items" loc:Loc.AutomationName="Retry failed items">
                                             <FontIcon Glyph="&#xE72C;" FontSize="13" />
                                         </Button>
                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveCommand}"
                                                 Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
-                                                ToolTipService.ToolTip="Remove pending job" AutomationProperties.Name="Remove pending job">
+                                                loc:Loc.ToolTip="Remove pending job" loc:Loc.AutomationName="Remove pending job">
                                             <FontIcon Glyph="&#xE74D;" FontSize="13" />
                                         </Button>
                                     </StackPanel>
@@ -166,16 +180,16 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="5" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding ProgressText}" FontSize="11"
+                                    <TextBlock Grid.Column="1" Text="{Binding ProgressText, Converter={StaticResource Localize}}" FontSize="11"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" MinWidth="120" TextAlignment="Right" />
                                 </Grid>
-                                <TextBlock Text="{Binding BatchSummary}" Style="{StaticResource CaptionTextStyle}"
+                                <TextBlock Text="{Binding BatchSummary, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                            Visibility="{Binding BatchSummary, Converter={StaticResource StringToVisibility}}" />
 
-                                <InfoBar IsOpen="{Binding HasError}" Severity="Error" Title="Job failed" Message="{Binding Error}"
+                                <InfoBar IsOpen="{Binding HasError}" Severity="Error" loc:Loc.Title="Job failed" Message="{Binding Error}"
                                          IsClosable="False" />
 
-                                <Expander Header="Items" IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                                <Expander loc:Loc.Header="Items" IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
                                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                     <ListView ItemsSource="{Binding Children}" SelectionMode="None" MaxHeight="300" Padding="0"
                                               ScrollViewer.HorizontalScrollMode="Disabled"
@@ -200,37 +214,49 @@
                                                     </Grid.ColumnDefinitions>
                                                     <FontIcon Glyph="&#xE8A5;" FontSize="13" VerticalAlignment="Top" Margin="0,2,0,0" />
                                                     <StackPanel Grid.Column="1" Spacing="2">
-                                                        <TextBlock Text="{Binding FileName}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding Detail}" FontSize="11" TextWrapping="Wrap"
+                                                        <TextBlock Text="{Binding FileName, Converter={StaticResource Localize}}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail, Converter={StaticResource Localize}}" FontSize="11" TextWrapping="Wrap"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                        <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{ThemeResource DangerBrush}"
+                                                        <TextBlock Text="{Binding Error, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource DangerBrush}"
                                                                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" TextWrapping="Wrap" />
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
                                                         <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="3" />
-                                                        <TextBlock Text="{Binding ProgressText}" FontSize="10" HorizontalAlignment="Right"
+                                                        <TextBlock Text="{Binding ProgressText, Converter={StaticResource Localize}}" FontSize="10" HorizontalAlignment="Right"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ViewReportCommand}"
+                                                                loc:Loc.ToolTip="View item diagnostic report" loc:Loc.AutomationName="View item diagnostic report">
+                                                            <FontIcon Glyph="&#xE890;" FontSize="12" />
+                                                        </Button>
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CopyReportCommand}"
+                                                                loc:Loc.ToolTip="Copy item diagnostic report" loc:Loc.AutomationName="Copy item diagnostic report">
+                                                            <FontIcon Glyph="&#xE8C8;" FontSize="12" />
+                                                        </Button>
+                                                        <Button Style="{StaticResource IconButtonStyle}" Command="{Binding SaveReportCommand}"
+                                                                loc:Loc.ToolTip="Save item diagnostic report" loc:Loc.AutomationName="Save item diagnostic report">
+                                                            <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                                        </Button>
                                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CancelItemCommand}"
                                                                 Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibility}}"
-                                                                ToolTipService.ToolTip="Cancel this item" AutomationProperties.Name="Cancel this item">
+                                                                loc:Loc.ToolTip="Cancel this item" loc:Loc.AutomationName="Cancel this item">
                                                             <FontIcon Glyph="&#xE769;" FontSize="12" />
                                                         </Button>
                                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveItemCommand}"
                                                                 Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
-                                                                ToolTipService.ToolTip="Remove this item without deleting its output"
-                                                                AutomationProperties.Name="Remove this item from queue">
+                                                                loc:Loc.ToolTip="Remove this item without deleting its output"
+                                                                loc:Loc.AutomationName="Remove this item from queue">
                                                             <FontIcon Glyph="&#xE74D;" FontSize="12" />
                                                         </Button>
                                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
                                                                 Visibility="{Binding CanOpenOutput, Converter={StaticResource BoolToVisibility}}"
-                                                                ToolTipService.ToolTip="Open output" AutomationProperties.Name="Open job output">
+                                                                loc:Loc.ToolTip="Open output" loc:Loc.AutomationName="Open job output">
                                                             <FontIcon Glyph="&#xE8E5;" FontSize="12" />
                                                         </Button>
                                                         <Button Style="{StaticResource IconButtonStyle}" Command="{Binding CompareCommand}"
                                                                 Visibility="{Binding CanCompare, Converter={StaticResource BoolToVisibility}}"
-                                                                ToolTipService.ToolTip="Compare before and after" AutomationProperties.Name="Compare before and after">
+                                                                loc:Loc.ToolTip="Compare before and after" loc:Loc.AutomationName="Compare before and after">
                                                             <FontIcon Glyph="&#xE8AB;" FontSize="12" />
                                                         </Button>
                                                     </StackPanel>

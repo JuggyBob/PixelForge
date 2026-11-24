@@ -5,18 +5,22 @@ using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Domain;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class ToolsPage : Page
+public sealed partial class ToolsPage : Page, ILocalizationAwarePage
 {
     public MediaToolsViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public ToolsPage()
     {
         ViewModel = App.Services.GetRequiredService<MediaToolsViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -51,7 +55,7 @@ public sealed partial class ToolsPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Add to media tools";
+            e.DragUIOverride.Caption = LocalizationService.T("Add to media tools");
             e.DragUIOverride.IsContentVisible = true;
         }
     }

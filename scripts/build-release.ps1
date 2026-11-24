@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.0.0",
+    [string]$Version = "2.0.0",
     [ValidateSet("all", "publish", "package")]
     [string]$Stage = "all",
     [string]$SignedAppPath,
@@ -10,24 +10,45 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\PixelForge.Presentation.WinUI\PixelForge.Presentation.WinUI.csproj"
+$cliProject = Join-Path $root "src\PixelForge.Cli\PixelForge.Cli.csproj"
 $publish = Join-Path $root "artifacts\publish\PixelForge"
+$cliPublish = Join-Path $root "artifacts\publish\cli"
 $installerDir = Join-Path $root "artifacts\installer"
 $portableDir = Join-Path $root "artifacts\portable"
 $iscc = Join-Path $root "tools\InnoSetup\ISCC.exe"
+
+function Get-Sha256([string]$Path) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            return ([System.BitConverter]::ToString($sha.ComputeHash($stream)) -replace '-', '').ToLowerInvariant()
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha.Dispose()
+    }
+}
 
 function Assert-PublishOutput {
     param([string]$PublishPath)
 
     $required = @(
         "PixelForge.exe",
+        "cli\pixelforge.exe",
+        "cli\ppocrv6_small_dict.txt",
         "PixelForge.dll",
         "PixelForge.pri",
         "App.xbf",
         "Views\ShellPage.xbf",
         "Views\ConverterPage.xbf",
+        "Views\PipelinesPage.xbf",
         "Views\ToolsPage.xbf",
         "Views\WatchFoldersPage.xbf",
         "Controls\FormatPicker.xbf",
+        "Controls\PipelineCanvas.xbf",
+        "Controls\PipelineNodeControl.xbf",
         "Themes\Styles.xbf",
         "THIRD-PARTY-NOTICES.md",
         "LICENSE.txt",
@@ -71,6 +92,25 @@ if ($Stage -in @("all", "publish")) {
         -p:Version=$Version -p:AssemblyVersion="$Version.0" -p:FileVersion="$Version.0" `
         -o $publish
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+
+    Write-Host "Publishing headless CLI..." -ForegroundColor Cyan
+    if (Test-Path $cliPublish) { Remove-Item $cliPublish -Recurse -Force }
+    dotnet publish $cliProject -c Release -r win-x64 --self-contained true -p:Platform=x64 `
+        -p:PublishSingleFile=true -p:PublishTrimmed=false -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=$Version `
+        -p:AssemblyVersion="$Version.0" -p:FileVersion="$Version.0" `
+        -o $cliPublish
+    if ($LASTEXITCODE -ne 0) { throw "CLI publish failed with exit code $LASTEXITCODE." }
+    $cliExe = Join-Path $cliPublish "pixelforge.exe"
+    if (-not (Test-Path $cliExe)) { throw "CLI publish did not produce pixelforge.exe." }
+    $cliDir = Join-Path $publish "cli"
+    New-Item -ItemType Directory -Force -Path $cliDir | Out-Null
+    Get-ChildItem $cliPublish -File | Where-Object { $_.Extension -notin '.pdb', '.lib' } |
+        Copy-Item -Destination $cliDir -Force
+    $cliResources = Join-Path $cliPublish "Resources"
+    if (Test-Path $cliResources) {
+        Get-ChildItem $cliResources -File | Copy-Item -Destination $cliDir -Force
+    }
+    Remove-Item $cliPublish -Recurse -Force
 
     # WinUI-generated XAML resources. The project has an AfterTargets=Publish copy as
     # well; repeating it here makes packaging resilient to SDK publish changes.
@@ -165,7 +205,7 @@ if ($Stage -in @("all", "package")) {
     if ($artifacts.Count -gt 0) {
         $checksums = Join-Path $root "artifacts\SHA256SUMS.txt"
         $lines = foreach ($file in $artifacts) {
-            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hash = Get-Sha256 $file
             "$hash  $([System.IO.Path]::GetFileName($file))"
         }
         $lines | Set-Content $checksums -Encoding ascii

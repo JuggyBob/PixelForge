@@ -4,18 +4,22 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class UpscalerPage : Page
+public sealed partial class UpscalerPage : Page, ILocalizationAwarePage
 {
     public UpscalerViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public UpscalerPage()
     {
         ViewModel = App.Services.GetRequiredService<UpscalerViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -43,7 +47,7 @@ public sealed partial class UpscalerPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Add images or scan a folder";
+            e.DragUIOverride.Caption = LocalizationService.T("Add images or scan a folder");
             e.DragUIOverride.IsContentVisible = true;
         }
     }

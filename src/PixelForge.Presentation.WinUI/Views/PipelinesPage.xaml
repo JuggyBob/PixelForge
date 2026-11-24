@@ -1,0 +1,376 @@
+<Page
+    x:Class="PixelForge.Presentation.Views.PipelinesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:PixelForge.Presentation.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    NavigationCacheMode="Required"
+    KeyDown="OnPageKeyDown"
+    mc:Ignorable="d">
+
+    <Grid x:Name="PipelinesRoot" Padding="28,22,28,24" RowSpacing="12">
+        <Grid x:Name="ManagementView">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="3">
+                    <TextBlock x:Name="PipelinesTitle"
+                               AutomationProperties.AutomationId="PipelinesTitle"
+                               loc:Loc.Text="Pipelines"
+                               Style="{StaticResource PageTitleTextStyle}" />
+                    <TextBlock loc:Loc.Text="Combine PixelForge operations into reusable visual workflows."
+                               Style="{StaticResource PageSubtitleTextStyle}" />
+                </StackPanel>
+                <Button x:Name="NewPipelineButton"
+                        Grid.Column="1"
+                        Click="OnNewPipelineClick"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        VerticalAlignment="Center"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        AutomationProperties.AutomationId="NewPipelineButton">
+                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE710;" FontFamily="{ThemeResource IconFontFamily}" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock loc:Loc.Text="New pipeline" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Grid x:Name="ManagementBody" Grid.Row="1" Margin="0,12,0,0" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="330" />
+                </Grid.ColumnDefinitions>
+
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <TextBox x:Name="PipelineSearch"
+                                 loc:Loc.Placeholder="Search pipelines"
+                                 Padding="12,6"
+                                 TextChanged="OnPipelineSearchChanged"
+                                 AutomationProperties.AutomationId="PipelineSearch" />
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <ListView x:Name="PipelineList"
+                                  ItemsSource="{Binding FilteredPipelines}"
+                                  SelectionMode="None"
+                                  IsItemClickEnabled="False"
+                                  HorizontalContentAlignment="Stretch"
+                                  Padding="0"
+                                  ScrollViewer.HorizontalScrollMode="Disabled"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource SectionCardStyle}" Margin="0,0,0,6" Padding="12,8">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" MinWidth="0" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Summary}" FontSize="11"
+                                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding ModifiedText}" FontSize="10"
+                                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding RunText}" FontSize="10"
+                                                               Foreground="{ThemeResource AccentTextBrush}" />
+                                                </Grid>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                                        VerticalAlignment="Center">
+                                                <Button Tag="{Binding}" Click="OnOpenPipelineClick"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        AutomationProperties.AutomationId="OpenPipelineButton"
+                                                        loc:Loc.Content="Open" />
+                                                <Button Tag="{Binding}" Click="OnRunPipelineClick"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        AutomationProperties.AutomationId="RunPipelineButton"
+                                                        loc:Loc.Content="Run" />
+                                                <Button Tag="{Binding}" Click="OnRenamePipelineClick"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        AutomationProperties.AutomationId="RenamePipelineButton"
+                                                        loc:Loc.Content="Rename" />
+                                                <Button Tag="{Binding}" Click="OnDuplicatePipelineClick"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        AutomationProperties.AutomationId="DuplicatePipelineButton"
+                                                        loc:Loc.Content="Duplicate" />
+                                                <Button Tag="{Binding}" Click="OnDeletePipelineClick"
+                                                        Style="{StaticResource DangerSubtleButtonStyle}"
+                                                        AutomationProperties.AutomationId="DeletePipelineButton"
+                                                        loc:Loc.Content="Delete" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <StackPanel x:Name="PipelineEmptyState"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="8"
+                                    Visibility="Collapsed">
+                            <FontIcon Glyph="&#xE8AB;" FontFamily="{ThemeResource IconFontFamily}"
+                                      FontSize="38" HorizontalAlignment="Center" />
+                            <TextBlock loc:Loc.Text="No pipelines yet" FontSize="18" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock loc:Loc.Text="Create an empty pipeline or start from a template."
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <Border Grid.Column="1" Style="{StaticResource SectionCardStyle}" Padding="16"
+                        VerticalAlignment="Top"
+                        MaxHeight="{Binding ActualHeight, ElementName=ManagementBody}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="10">
+                            <TextBlock loc:Loc.Text="Start from a template"
+                                       Style="{StaticResource SectionTitleTextStyle}" />
+                            <ItemsControl ItemsSource="{Binding TemplateItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{ThemeResource SubtleSurfaceBrush}"
+                                                BorderBrush="{ThemeResource DividerBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="12"
+                                                Margin="0,0,0,6">
+                                            <StackPanel Spacing="5">
+                                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                                    <FontIcon Glyph="{Binding IconGlyph}"
+                                                              FontFamily="{ThemeResource IconFontFamily}"
+                                                              FontSize="14"
+                                                              VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap"
+                                                           FontSize="11"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Button Tag="{Binding}" Click="OnUseTemplateClick"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        HorizontalAlignment="Left"
+                                                        loc:Loc.Content="Use template" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Grid x:Name="EditorView" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid ColumnSpacing="8" Margin="0,0,0,8" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MinWidth="0" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Click="OnBackClick" Style="{StaticResource SecondaryButtonStyle}"
+                        MinHeight="36" Padding="12,6" VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="PipelineBackButton">
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE72B;" FontFamily="{ThemeResource IconFontFamily}" FontSize="14" VerticalAlignment="Center" />
+                        <TextBlock loc:Loc.Text="Back" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Grid Grid.Column="1" ColumnSpacing="8" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="120" MaxWidth="240" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="PipelineNameBox"
+                             Height="36"
+                             HorizontalAlignment="Stretch"
+                             VerticalContentAlignment="Center"
+                             TextChanged="OnPipelineNameChanged"
+                             AutomationProperties.AutomationId="PipelineNameBox" />
+                    <Grid Grid.Column="1" Width="20" Height="20" VerticalAlignment="Center"
+                          ToolTipService.ToolTip="{Binding Editor.SaveStatus}"
+                          AutomationProperties.Name="{Binding Editor.SaveStatus}">
+                        <ProgressRing Width="16" Height="16"
+                                      IsActive="{Binding Editor.IsSaving}"
+                                      Visibility="{Binding Editor.IsSaving, Converter={StaticResource BoolToVisibility}}" />
+                        <FontIcon Glyph="&#xE73E;" FontSize="13"
+                                  Foreground="{ThemeResource SuccessBrush}"
+                                  Visibility="{Binding Editor.ShowSavedIndicator, Converter={StaticResource BoolToVisibility}}" />
+                        <Ellipse Width="7" Height="7"
+                                 Fill="{ThemeResource AccentPrimaryBrush}"
+                                 Visibility="{Binding Editor.ShowUnsavedIndicator, Converter={StaticResource BoolToVisibility}}" />
+                        <FontIcon Glyph="&#xE783;" FontSize="13"
+                                  Foreground="{ThemeResource DangerBrush}"
+                                  Visibility="{Binding Editor.SaveFailed, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+                    <ProgressBar Grid.Column="2" Width="48" Height="4" Maximum="1"
+                                 VerticalAlignment="Center"
+                                 Value="{Binding Editor.RunProgress}"
+                                 Visibility="{Binding Editor.HasRun, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Editor.RunMessage}" FontSize="11"
+                               MaxWidth="110" TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Command="{Binding Editor.UndoCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Undo" loc:Loc.AutomationName="Undo"
+                            AutomationProperties.AutomationId="PipelineUndo">
+                        <FontIcon Glyph="&#xE7A7;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.RedoCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Redo" loc:Loc.AutomationName="Redo"
+                            AutomationProperties.AutomationId="PipelineRedo">
+                        <FontIcon Glyph="&#xE7A6;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.DeleteSelectedCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Delete" loc:Loc.AutomationName="Delete"
+                            AutomationProperties.AutomationId="PipelineDelete">
+                        <FontIcon Glyph="&#xE74D;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.ZoomOutCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Zoom out" loc:Loc.AutomationName="Zoom out"
+                            AutomationProperties.AutomationId="PipelineZoomOut">
+                        <FontIcon Glyph="&#xE71F;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.ZoomInCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Zoom in" loc:Loc.AutomationName="Zoom in"
+                            AutomationProperties.AutomationId="PipelineZoomIn">
+                        <FontIcon Glyph="&#xE8A3;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.FitToViewCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Fit to view" loc:Loc.AutomationName="Fit to view"
+                            AutomationProperties.AutomationId="PipelineFit">
+                        <FontIcon Glyph="&#xE9A6;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.AutoLayoutCommand}" Style="{StaticResource ToolbarIconButtonStyle}"
+                            loc:Loc.ToolTip="Auto layout" loc:Loc.AutomationName="Auto layout"
+                            AutomationProperties.AutomationId="PipelineAutoLayout">
+                        <FontIcon Glyph="&#xE8FD;" FontFamily="{ThemeResource IconFontFamily}" FontSize="16" />
+                    </Button>
+                    <Button Command="{Binding Editor.RunCommand}"
+                            IsEnabled="{Binding Editor.IsValid}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            MinHeight="40"
+                            AutomationProperties.AutomationId="PipelineRunButton"
+                            Visibility="{Binding Editor.IsRunning, Converter={StaticResource InverseBoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE768;" FontFamily="{ThemeResource IconFontFamily}" FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock loc:Loc.Text="Run pipeline" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding Editor.CancelRunCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            MinHeight="40"
+                            Visibility="{Binding Editor.IsRunning, Converter={StaticResource BoolToVisibility}}"
+                            loc:Loc.Content="Cancel" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" Background="{ThemeResource AppSolidBackgroundBrush}">
+                <controls:PipelineCanvas x:Name="Canvas" AutomationProperties.AutomationId="PipelineCanvas" />
+                <InfoBar x:Name="EditorValidationBar"
+                         IsOpen="False"
+                         Severity="Warning"
+                         IsClosable="False"
+                         VerticalAlignment="Top"
+                         Margin="12"
+                         MaxWidth="720"
+                         HorizontalAlignment="Center" />
+            </Grid>
+
+            <Border x:Name="ActionDrawer" Grid.Row="2" Height="48" Margin="0,10,0,0"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    VerticalAlignment="Bottom">
+                <Grid RowSpacing="6" Padding="14,6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="ActionDrawerToggle" Click="OnActionDrawerToggle"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                AutomationProperties.AutomationId="ActionDrawerToggle">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <FontIcon x:Name="ActionDrawerGlyph" Glyph="&#xE70E;"
+                                          FontFamily="{ThemeResource IconFontFamily}" FontSize="11" />
+                                <TextBlock loc:Loc.Text="Action library" />
+                            </StackPanel>
+                        </Button>
+                        <TextBox x:Name="ActionSearch" Grid.Column="1" Width="240" Height="32"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 loc:Loc.Placeholder="Search actions"
+                                 TextChanged="OnActionSearchChanged"
+                                 AutomationProperties.AutomationId="PipelineActionSearch" />
+                        <TextBlock x:Name="ActionInsertionHint" Grid.Column="2"
+                                   VerticalAlignment="Center" FontSize="11"
+                                   HorizontalAlignment="Right"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+
+                    <Grid x:Name="ActionDrawerBody" Grid.Row="1" Visibility="Collapsed" RowSpacing="4">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <StackPanel x:Name="ActionCategoryBar" Orientation="Horizontal" Spacing="4" />
+                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="ActionCards" Orientation="Horizontal" Spacing="6" Padding="0,0,12,18" />
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

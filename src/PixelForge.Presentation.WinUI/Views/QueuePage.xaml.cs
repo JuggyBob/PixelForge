@@ -4,18 +4,22 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Presentation.Services;
 using PixelForge.Presentation.ViewModels;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class QueuePage : Page
+public sealed partial class QueuePage : Page, ILocalizationAwarePage
 {
     public QueueViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public QueuePage()
     {
         ViewModel = App.Services.GetRequiredService<QueueViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

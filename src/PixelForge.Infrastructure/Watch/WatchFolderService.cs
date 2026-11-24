@@ -32,10 +32,15 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
     private readonly List<WatchFolderRule> _rules = [];
     private readonly Dictionary<string, PendingFile> _pending = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProcessedFile> _processed = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _processedThisSession = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<Guid, QueuedFile> _queued = new();
+    private readonly object _queuedLock = new();
     private readonly SemaphoreSlim _scanGate = new(1, 1);
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
+    private Task? _initializeTask;
+    private readonly object _initializeLock = new();
     private bool _initialized;
     private bool _disposed;
 
@@ -48,6 +53,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         _serializer = serializer;
         _paths = paths;
         _logger = logger;
+        _jobs.JobChanged += OnJobChanged;
     }
 
     public IReadOnlyList<WatchFolderRule> Rules
@@ -60,10 +66,19 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
 
     public event EventHandler? RulesChanged;
 
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (_initialized) return;
-        _initialized = true;
+        lock (_initializeLock)
+        {
+            if (_initialized) return _initializeTask ?? Task.CompletedTask;
+            _initialized = true;
+            _initializeTask = InitializeCoreAsync(cancellationToken);
+            return _initializeTask;
+        }
+    }
+
+    private async Task InitializeCoreAsync(CancellationToken cancellationToken)
+    {
         await LoadAsync(cancellationToken);
         _loopCts = new CancellationTokenSource();
         _loopTask = Task.Run(() => LoopAsync(_loopCts.Token), CancellationToken.None);
@@ -90,16 +105,40 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
 
     public async Task UpdateAsync(WatchFolderRule rule, CancellationToken cancellationToken = default)
     {
-        ValidateRule(rule);
-        lock (_rulesLock)
+        await _scanGate.WaitAsync(cancellationToken);
+        try
         {
-            var index = _rules.FindIndex(r => r.Id == rule.Id);
-            if (index < 0) throw new InvalidOperationException("The watch rule was not found.");
-            _rules[index] = rule.Clone();
-        }
+            ValidateRule(rule);
+            var stateCleared = false;
+            lock (_rulesLock)
+            {
+                var index = _rules.FindIndex(r => r.Id == rule.Id);
+                if (index < 0) throw new InvalidOperationException("The watch rule was not found.");
+                var previous = _rules[index];
+                _rules[index] = rule.Clone();
+                var identityChanged = previous.Operation != rule.Operation ||
+                                      !string.Equals(previous.InputDirectory, rule.InputDirectory, StringComparison.OrdinalIgnoreCase) ||
+                                      !string.Equals(previous.OutputDirectory, rule.OutputDirectory, StringComparison.OrdinalIgnoreCase);
+                if (identityChanged || !rule.IgnorePreviouslyProcessed)
+                {
+                    var prefix = rule.Id.ToString("N") + "|";
+                    foreach (var key in _pending.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+                        _pending.Remove(key);
+                    foreach (var key in _processed.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+                        _processed.Remove(key);
+                    _processedThisSession.RemoveWhere(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+                    stateCleared = true;
+                }
+            }
 
-        await SaveRulesAsync(cancellationToken);
-        RaiseChanged();
+            await SaveRulesAsync(cancellationToken);
+            if (stateCleared || !rule.IgnorePreviouslyProcessed) await SaveStateAsync(cancellationToken);
+            RaiseChanged();
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -107,8 +146,12 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         lock (_rulesLock)
         {
             _rules.RemoveAll(r => r.Id == id);
-            foreach (var key in _processed.Keys.Where(k => k.StartsWith(id.ToString("N") + "|", StringComparison.OrdinalIgnoreCase)).ToList())
+            var prefix = id.ToString("N") + "|";
+            foreach (var key in _pending.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+                _pending.Remove(key);
+            foreach (var key in _processed.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
                 _processed.Remove(key);
+            _processedThisSession.RemoveWhere(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
         }
 
         await SaveRulesAsync(cancellationToken);
@@ -186,9 +229,13 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         IEnumerable<string> files;
         try
         {
-            files = Directory.EnumerateFiles(rule.InputDirectory, "*", rule.IncludeSubdirectories
-                ? SearchOption.AllDirectories
-                : SearchOption.TopDirectoryOnly);
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = rule.IncludeSubdirectories,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+                IgnoreInaccessible = true
+            };
+            files = Directory.EnumerateFiles(rule.InputDirectory, "*", options);
         }
         catch (Exception ex)
         {
@@ -203,7 +250,10 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
             if (IsUnderOutput(rule, path)) continue;
             if (!IsStable(rule, path, out var signature)) continue;
             var key = ProcessedKey(rule.Id, path);
-            if (_processed.TryGetValue(key, out var processed) && processed.Matches(signature)) continue;
+            if (_processed.TryGetValue(key, out var processed) && processed.Matches(signature))
+            {
+                if (rule.IgnorePreviouslyProcessed || _processedThisSession.Contains(key)) continue;
+            }
             await TryProcessAsync(rule, path, signature, key, cancellationToken);
         }
     }
@@ -247,13 +297,15 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
             var validation = await _jobs.ValidateAsync(request, cancellationToken);
             if (!validation.IsValid)
             {
-                MarkProcessed(key, signature);
+                if (!IsTransientValidation(validation)) MarkProcessed(key, signature);
                 await SetErrorAsync(rule, $"{Path.GetFileName(path)}: {validation.Summary}", cancellationToken);
                 return;
             }
 
             var job = await _jobs.EnqueueAsync(request, cancellationToken);
-            MarkProcessed(key, signature);
+            lock (_queuedLock) _queued[job.Id] = new QueuedFile(key, signature);
+            if (job.IsTerminal)
+                OnJobChanged(this, new JobChangedEventArgs { Job = job, Kind = JobChangeKind.Updated });
             lock (_rulesLock)
             {
                 var stored = _rules.FirstOrDefault(r => r.Id == rule.Id);
@@ -276,9 +328,34 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Watch folder could not queue {File}", path);
-            MarkProcessed(key, signature);
             await SetErrorAsync(rule, ex.Message, cancellationToken);
         }
+    }
+
+    private static bool IsTransientValidation(ValidationResult validation) =>
+        validation.Issues.Any(issue =>
+            issue.Code.Contains("model", StringComparison.OrdinalIgnoreCase) ||
+            issue.Code.Contains("runtime", StringComparison.OrdinalIgnoreCase) ||
+            issue.Code.Contains("provider", StringComparison.OrdinalIgnoreCase) ||
+            issue.Code.Contains("download", StringComparison.OrdinalIgnoreCase) ||
+            issue.Code is "video.upscale.scale" or "video.upscale.none" or "engine.unavailable" ||
+            (issue.Details?.Contains("not installed", StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private void OnJobChanged(object? sender, JobChangedEventArgs e)
+    {
+        if (e.Kind != JobChangeKind.Updated || !e.Job.IsTerminal) return;
+        QueuedFile? queued;
+        lock (_queuedLock)
+        {
+            if (!_queued.TryGetValue(e.Job.Id, out queued)) return;
+            _queued.Remove(e.Job.Id);
+        }
+
+        if (e.Job.State != JobState.Completed || e.Job.FailedItems > 0 || e.Job.CancelledItems > 0)
+            return;
+
+        MarkProcessed(queued.Key, queued.Signature);
+        _ = SaveStateAsync(CancellationToken.None);
     }
 
     private bool IsStable(WatchFolderRule rule, string path, out FileSignature signature)
@@ -326,6 +403,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
     private void MarkProcessed(string key, FileSignature signature)
     {
         _processed[key] = new ProcessedFile(signature);
+        _processedThisSession.Add(key);
         if (_processed.Count > 5000)
         {
             foreach (var oldest in _processed.Keys.Take(_processed.Count - 5000).ToList())
@@ -350,7 +428,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         OperationKind.ImageConvert or OperationKind.UpscaleAi or OperationKind.UpscaleTraditional =>
             info.Category == MediaCategory.Image,
         OperationKind.AudioConvert => info.Category is MediaCategory.Audio or MediaCategory.Video,
-        OperationKind.VideoConvert => info.Category == MediaCategory.Video,
+        OperationKind.VideoConvert or OperationKind.VideoUpscale => info.Category == MediaCategory.Video,
         OperationKind.DocumentConvert => info.Category is MediaCategory.Document or MediaCategory.Ebook,
         OperationKind.EbookConvert => info.Category is MediaCategory.Document or MediaCategory.Ebook,
         OperationKind.ArchiveConvert => info.Category == MediaCategory.Archive || rule.Settings is ArchiveConversionSettings { Action: ArchiveAction.Create },
@@ -364,7 +442,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
     {
         OperationKind.ImageConvert or OperationKind.UpscaleAi or OperationKind.UpscaleTraditional => MediaCategory.Image,
         OperationKind.AudioConvert => MediaCategory.Audio,
-        OperationKind.VideoConvert => MediaCategory.Video,
+        OperationKind.VideoConvert or OperationKind.VideoUpscale => MediaCategory.Video,
         OperationKind.DocumentConvert => MediaCategory.Document,
         OperationKind.EbookConvert => MediaCategory.Ebook,
         OperationKind.ArchiveConvert => settings is ArchiveConversionSettings { Action: ArchiveAction.Create }
@@ -393,21 +471,58 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         _ => FormatCatalog.GetInputExtensions(CategoryHint(rule.Operation, rule.Settings))
     };
 
-    private static void ValidateRule(WatchFolderRule rule)
+    private void ValidateRule(WatchFolderRule rule)
     {
         if (string.IsNullOrWhiteSpace(rule.InputDirectory) || !Directory.Exists(rule.InputDirectory))
             throw new InvalidOperationException("Choose an existing input folder.");
         if (string.IsNullOrWhiteSpace(rule.OutputDirectory))
             throw new InvalidOperationException("Choose an output folder.");
-        if (string.Equals(Path.GetFullPath(rule.InputDirectory), Path.GetFullPath(rule.OutputDirectory),
-                StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("The input and output folders must be different to prevent processing loops.");
-        if (string.IsNullOrWhiteSpace(rule.Name)) rule.Name = "Watched folder";
-        rule.InputDirectory = Path.GetFullPath(rule.InputDirectory);
-        rule.OutputDirectory = Path.GetFullPath(rule.OutputDirectory);
+        var input = Path.GetFullPath(rule.InputDirectory);
+        var output = Path.GetFullPath(rule.OutputDirectory);
+        if ((File.GetAttributes(input) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("The watched input folder cannot be a symbolic link or junction.");
+        ValidateRuleRelationship(rule, input, output);
         Directory.CreateDirectory(rule.OutputDirectory);
         if (rule.Settings.Operation != rule.Operation)
             throw new InvalidOperationException("The rule settings do not match the selected operation.");
+    }
+
+    /// <summary>
+    /// Validation used when loading persisted rules. Rules for temporarily
+    /// unavailable drives/folders are kept so they resume when the path
+    /// returns; only structural and security invariants are enforced.
+    /// </summary>
+    private static void ValidateLoadedRule(WatchFolderRule rule)
+    {
+        if (string.IsNullOrWhiteSpace(rule.InputDirectory) ||
+            string.IsNullOrWhiteSpace(rule.OutputDirectory))
+            throw new InvalidOperationException("The watch rule is missing a folder.");
+        var input = Path.GetFullPath(rule.InputDirectory);
+        var output = Path.GetFullPath(rule.OutputDirectory);
+        if (Directory.Exists(input) &&
+            (File.GetAttributes(input) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("The watched input folder cannot be a symbolic link or junction.");
+        ValidateRuleRelationship(rule, input, output);
+        if (rule.Settings.Operation != rule.Operation)
+            throw new InvalidOperationException("The rule settings do not match the selected operation.");
+    }
+
+    private static void ValidateRuleRelationship(WatchFolderRule rule, string input, string output)
+    {
+        if (string.Equals(input, output, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The input and output folders must be different to prevent processing loops.");
+        if (IsPathInside(input, output) || IsPathInside(output, input))
+            throw new InvalidOperationException("Input and output folders must not be nested inside each other.");
+        if (string.IsNullOrWhiteSpace(rule.Name)) rule.Name = "Watched folder";
+        rule.InputDirectory = input;
+        rule.OutputDirectory = output;
+    }
+
+    private static bool IsPathInside(string child, string parent)
+    {
+        var prefix = parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) +
+                     Path.DirectorySeparatorChar;
+        return child.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ProcessedKey(Guid ruleId, string path) =>
@@ -430,20 +545,23 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
                             try
                             {
                                 var settings = _serializer.Deserialize(persisted.Operation, persisted.SettingsJson);
-                                _rules.Add(new WatchFolderRule
+                                var rule = new WatchFolderRule
                                 {
                                     Id = persisted.Id,
                                     Name = persisted.Name,
                                     InputDirectory = persisted.InputDirectory,
                                     OutputDirectory = persisted.OutputDirectory,
                                     IncludeSubdirectories = persisted.IncludeSubdirectories,
+                                    IgnorePreviouslyProcessed = persisted.IgnorePreviouslyProcessed,
                                     IsEnabled = persisted.IsEnabled,
                                     Operation = persisted.Operation,
                                     Settings = settings,
                                     CreatedAt = persisted.CreatedAt,
                                     LastTriggeredAt = persisted.LastTriggeredAt,
                                     LastError = persisted.LastError
-                                });
+                                };
+                                ValidateLoadedRule(rule);
+                                _rules.Add(rule);
                             }
                             catch (Exception ex)
                             {
@@ -458,6 +576,8 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
                 _logger.LogWarning(ex, "Could not load watch folders");
             }
         }
+
+        _logger.LogInformation("Loaded {Count} watch rules", _rules.Count);
 
         var statePath = StatePath;
         if (File.Exists(statePath))
@@ -495,6 +615,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
                         InputDirectory = rule.InputDirectory,
                         OutputDirectory = rule.OutputDirectory,
                         IncludeSubdirectories = rule.IncludeSubdirectories,
+                        IgnorePreviouslyProcessed = rule.IgnorePreviouslyProcessed,
                         IsEnabled = rule.IsEnabled,
                         Operation = rule.Operation,
                         SettingsJson = _serializer.Serialize(rule.Settings),
@@ -565,6 +686,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _jobs.JobChanged -= OnJobChanged;
         try { _loopCts?.Cancel(); } catch { }
         _loopCts?.Dispose();
         _scanGate.Dispose();
@@ -573,6 +695,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
 
     private readonly record struct FileSignature(long Length, DateTime LastWriteUtc);
     private sealed record PendingFile(FileSignature Signature, DateTime FirstSeen);
+    private sealed record QueuedFile(string Key, FileSignature Signature);
     private sealed record ProcessedFile(FileSignature Signature)
     {
         public bool Matches(FileSignature signature) => Signature.Equals(signature);
@@ -590,6 +713,7 @@ public sealed class WatchFolderService : IWatchFolderService, IDisposable
         public string InputDirectory { get; set; } = "";
         public string OutputDirectory { get; set; } = "";
         public bool IncludeSubdirectories { get; set; }
+        public bool IgnorePreviouslyProcessed { get; set; } = true;
         public bool IsEnabled { get; set; }
         public OperationKind Operation { get; set; }
         public string SettingsJson { get; set; } = "";

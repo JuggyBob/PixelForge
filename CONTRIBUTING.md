@@ -61,10 +61,14 @@ Keep commits focused. Do not commit build output, downloaded models, test eviden
 Before opening a pull request:
 
 ```powershell
-dotnet test tests\PixelForge.Tests.Unit\PixelForge.Tests.Unit.csproj -c Release
+dotnet test tests\PixelForge.Tests.Unit\PixelForge.Tests.Unit.csproj -c Release -p:Platform=x64
+dotnet test tests\PixelForge.Tests.Integration\PixelForge.Tests.Integration.csproj -c Release -p:Platform=x64
+dotnet test tests\PixelForge.Tests.Ui\PixelForge.Tests.Ui.csproj -c Release -p:Platform=x64
 ```
 
-Run integration or UI tests when your change touches engines, navigation, settings, or media behavior. If a test requires optional models or hardware, state exactly what was and was not verified.
+Run integration or UI tests when your change touches engines, navigation, settings, or media behavior. The UI suite drives the real WinUI window and needs an interactive desktop session. If a test requires optional models or hardware, state exactly what was and was not verified.
+
+For the v2.0.0 release, the final pass ran 84 unit, 40 integration, and 20 desktop UI tests (144 passed). Release assets are unsigned; see [CODE_SIGNING.md](CODE_SIGNING.md).
 
 Do not weaken or skip a test just to make a failing change pass. Fix the cause or report the limitation.
 

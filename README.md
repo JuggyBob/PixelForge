@@ -14,11 +14,18 @@ PixelForge brings image, audio, video, document, e-book, and archive conversion 
 
 | Package | Download |
 |---|---|
-| Windows x64 installer | [PixelForge-Setup-1.0.0-x64.exe](https://github.com/JuggyBob/PixelForge/releases/download/v1.0.0/PixelForge-Setup-1.0.0-x64.exe) |
-| Portable ZIP | [PixelForge-Portable-1.0.0-x64.zip](https://github.com/JuggyBob/PixelForge/releases/download/v1.0.0/PixelForge-Portable-1.0.0-x64.zip) |
-| Checksums | [SHA256SUMS.txt](https://github.com/JuggyBob/PixelForge/releases/download/v1.0.0/SHA256SUMS.txt) |
+| Windows x64 installer (Inno Setup) | [PixelForge-Setup-2.0.0-x64.exe](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/PixelForge-Setup-2.0.0-x64.exe) |
+| Windows x64 MSI (alternative installer) | [PixelForge-Setup-2.0.0-x64.msi](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/PixelForge-Setup-2.0.0-x64.msi) |
+| Portable ZIP | [PixelForge-Portable-2.0.0-x64.zip](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/PixelForge-Portable-2.0.0-x64.zip) |
+| Checksums | [SHA256SUMS.txt](https://github.com/JuggyBob/PixelForge/releases/download/v2.0.0/SHA256SUMS.txt) |
 
-The installer is per-user and does not require administrator rights. The portable ZIP can be extracted anywhere.
+> **These v2.0.0 assets are unsigned.** Windows SmartScreen may show a warning.
+> Verify the SHA-256 values in `SHA256SUMS.txt` before running an installer.
+> See [CODE_SIGNING.md](CODE_SIGNING.md).
+
+The installers are per-user and do not require administrator rights. The MSI
+refuses to install while the Inno Setup product is installed. The portable ZIP
+can be extracted anywhere.
 
 ## Table of contents
 
@@ -52,7 +59,7 @@ The application is designed for people who need a dependable local media workflo
 - Upscale images with traditional resampling or local AI models.
 - Upscale video frame by frame and interpolate frame rates with RIFE.
 - Turn scanned pages into ordered DOCX and PDF documents.
-- Automate repeat work with watch folders and a persistent queue.
+- Automate repeat work with watch folders, reusable visual pipelines, and a persistent queue.
 - Keep a searchable local history without storing copies of your media.
 
 PixelForge does not require a subscription, an account, a browser, Docker, Python, or a web server. Optional model weights are downloaded only when you ask for them and are verified before use.
@@ -89,6 +96,16 @@ Use five traditional resampling algorithms or local AI models including Real-ESR
 
 Order scanned pages, choose PP-OCRv6 or an optional advanced model, and produce one DOCX with an optional PDF companion. Reading order is column-aware.
 
+### Pipelines
+
+![Pipelines](docs/screenshots/pipelines.png)
+
+Chain operations into reusable visual workflows. Start from a built-in template or add actions from the searchable action library, then run the result through the shared queue.
+
+![Pipeline editor](docs/screenshots/pipeline-editor.png)
+
+The editor shows a saved Input → Resize image → Convert image → Output graph with the Convert step expanded to reveal its settings.
+
 ### Processing queue
 
 ![Processing queue](docs/screenshots/processing-queue.png)
@@ -105,7 +122,7 @@ Inspect installed and available models, install from the catalogue or a local fi
 
 ![Settings](docs/screenshots/settings.png)
 
-Themes, accent colour, fonts, font scaling, conversion defaults, OCR options, processing concurrency, storage retention, and diagnostics are persisted locally.
+The General page includes a runtime Language selector with native labels and bundled flags, alongside themes, accent colour, fonts, and font scaling. Conversion defaults, OCR options, processing concurrency, storage retention, and diagnostics are persisted locally.
 
 More screenshots are available in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
@@ -156,13 +173,31 @@ More screenshots are available in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 - Optional PDF generated from the same ordered DOCX content.
 - Low-confidence page warnings and explicit unsupported-input reporting.
 
+### Pipelines
+
+- Visual, pannable node canvas for chaining operations into reusable workflows.
+- Built-in templates and a searchable action library for quickly assembling a graph.
+- Expand individual nodes to configure their settings, with undo/redo and autosave.
+- Run a pipeline through the shared processing queue with per-file failure isolation and cancellation.
+
 ### Queue, history, and automation
 
 - Persistent central queue with configurable concurrency, per-job and per-item cancellation, retry, failure reasons, and interrupted-job recovery.
 - Watch folders that wait for stable files, respect subfolder settings, avoid output loops, persist processed-file state, and enqueue ordinary queue jobs.
 - SQLite-backed history with search, filters, open/reveal/repeat/compare actions, and retention controls.
 - In-app notification centre with unread badge and live progress.
-- Local-only operation; no telemetry or background network calls.
+- Local-only processing; no telemetry. An optional GitHub update check is off by default.
+
+### 2.0.0 additions
+
+- **Visual Pipelines** under Converter: chain operations on a pannable node canvas with templates, undo/redo, autosave, batch execution through the shared queue, per-file failure isolation, cancellation, and localized output policies. See [docs/PIPELINES.md](docs/PIPELINES.md).
+- **Ten-language runtime localization**: English, German, Spanish, Portuguese (Brazil), Korean, Italian, French, Japanese, Simplified Chinese, and Russian, with a Settings > General > Language selector, bundled flags, native labels, English per-key fallback, CLDR plural forms, and locale-aware formatting. Technical identifiers remain unchanged.
+- **Headless `pixelforge` CLI** for conversion, image/video upscaling, OCR, and media tools using the same engines and queue. See [docs/CLI.md](docs/CLI.md).
+- **Windows Explorer integration**: submenu and folder command that activate the running app and stage files on the correct page. See [docs/EXPLORER_INTEGRATION.md](docs/EXPLORER_INTEGRATION.md).
+- **Optional GitHub update checks** in Settings > About, off by default, with no telemetry and no automatic installation. See [docs/UPDATES.md](docs/UPDATES.md).
+- **Inline Watch Folder rule editing**, image/video upscaling rules, persistent processed-file suppression, and safer reconfiguration. See [docs/WATCH_FOLDERS.md](docs/WATCH_FOLDERS.md).
+- **MSI installer** alongside the existing Inno Setup EXE and portable ZIP.
+- Optional temporal stability for video upscaling, resumable model/runtime downloads, requested-vs-actual provider reporting, copyable job reports, versioned history export/import, first-run onboarding, and automatic llama.cpp runtime upgrades.
 
 ## Supported formats
 
@@ -183,21 +218,31 @@ See [docs/SUPPORTED_FORMATS.md](docs/SUPPORTED_FORMATS.md) for detailed input/ou
 
 ### Setup installer
 
-1. Download `PixelForge-Setup-1.0.0-x64.exe` from the [v1.0.0 release](https://github.com/JuggyBob/PixelForge/releases/tag/v1.0.0).
+1. Download `PixelForge-Setup-2.0.0-x64.exe` from the [v2.0.0 release](https://github.com/JuggyBob/PixelForge/releases/tag/v2.0.0).
 2. Run the installer. It installs per user by default to `%LOCALAPPDATA%\Programs\PixelForge`.
 3. Start PixelForge from the Start menu. A desktop shortcut is optional.
 4. To remove it, use **Settings > Apps > PixelForge > Uninstall**, or the uninstaller in the installation folder.
 
+> Unsigned release: verify the SHA-256 checksum before running the installer.
+
 The installer does not require administrator rights. It includes FFmpeg, Pandoc, Typst, 7-Zip, Zstandard, ImageMagick, ONNX Runtime, the bundled offline helper models, and the required Windows App SDK runtime.
+
+### MSI installer
+
+1. Download `PixelForge-Setup-2.0.0-x64.msi` from the [v2.0.0 release](https://github.com/JuggyBob/PixelForge/releases/tag/v2.0.0).
+2. Run the MSI. It installs per user to `%LOCALAPPDATA%\Programs\PixelForge`, does not require administrator rights, and refuses to install while the Inno Setup product is installed. Windows may list it in the machine-wide Add/Remove Programs view while the files remain under the current user.
+3. Start PixelForge from the Start menu; remove it via **Settings > Apps > PixelForge > Uninstall**.
+
+The MSI is unsigned for v2.0.0; Windows SmartScreen may warn.
 
 ### Portable ZIP
 
-1. Download `PixelForge-Portable-1.0.0-x64.zip`.
+1. Download `PixelForge-Portable-2.0.0-x64.zip`.
 2. Extract it to a folder you can write to.
 3. Run `PixelForge.exe`.
 4. By default, user data lives in `%LOCALAPPDATA%\PixelForge`; set `PIXELFORGE_DATA_DIR` to keep a profile beside the application.
 
-The portable package contains the same runtime engines as the installer. It does not register shortcuts or an uninstaller.
+The portable package contains the same runtime engines as the installers. It does not register shortcuts or an uninstaller. The executable inside the ZIP is unsigned for v2.0.0.
 
 ### Optional AI models
 
@@ -285,18 +330,20 @@ Integration and UI tests require the external engines and optional model fixture
 ### Build release packages
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.0.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 2.0.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 2.0.0
 ```
 
 Outputs:
 
 ```text
-artifacts\installer\PixelForge-1.0.0-Setup.exe
-artifacts\portable\PixelForge-1.0.0-portable.zip
+artifacts\installer\PixelForge-2.0.0-Setup.exe
+artifacts\installer-msi\PixelForge-2.0.0-Setup.msi
+artifacts\portable\PixelForge-2.0.0-portable.zip
 artifacts\SHA256SUMS.txt
 ```
 
-The release script publishes a self-contained x64 build, removes development symbols, creates the portable ZIP, builds the per-user installer, and generates SHA-256 checksums.
+The release script publishes a self-contained x64 build, removes development symbols, creates the portable ZIP, builds the per-user installer, and generates SHA-256 checksums. The v2.0.0 assets were built locally and published unsigned; the SignPath staged-build workflow is not used for this release.
 
 ## Configuration and data
 
@@ -333,23 +380,25 @@ Dense columns, tables with merged cells, seals, handwriting, and decorative layo
 
 ## Privacy and security
 
-All normal processing runs locally. PixelForge does not include telemetry, analytics, or background cloud calls. Network access occurs only when you explicitly download a model or runtime. The llama.cpp advanced-OCR server binds to loopback for the duration of a job.
+All normal processing runs locally. PixelForge does not include telemetry, analytics, or background cloud calls. Network access occurs only for an optional update check you enable in Settings > About (off by default), explicit model/runtime downloads, a required runtime upgrade after an app update, or links you open. The llama.cpp advanced-OCR server binds to loopback for the duration of a job.
 
 PixelForge stores settings, queue state, history, logs, and optional models in its local application-data folder. It does not upload media. See [PRIVACY.md](PRIVACY.md) for the full privacy policy and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Known limitations
 
-- Windows x64 only at this release. macOS and Linux are not supported.
+- Windows x64 only in 2.0.0; ARM64 is deferred. macOS and Linux are not supported.
+- MSIX is not produced. PixelForge is an unpackaged, self-contained WinUI build; the MSI is an alternative per-user package, not an MSIX.
 - Hardware acceleration is not universal; the application reports unavailable providers and falls back to CPU where supported.
 - Advanced OCR models and AI upscalers are optional downloads and add significant disk usage.
 - OCR is page-level reconstruction, not full document-layout analysis; complex forms and handwriting may need review.
-- Video super-resolution uses frame-by-frame AI models; fast motion can show temporal shimmer.
+- Video super-resolution uses frame-by-frame AI models; fast motion can show temporal shimmer. Temporal VSR models are not integrated.
+- On Windows 11, classic Explorer verbs appear under **Show more options**; a compact-menu `IExplorerCommand` extension requires a packaged app and is not included.
 - DRM-protected e-books are refused; PixelForge does not bypass DRM.
-- The initial v1.0.0 installer is not code-signed. SignPath Foundation enrollment is in progress; signed releases will follow. Windows SmartScreen may show a warning for the unsigned build.
+- The v2.0.0 assets, including the MSI, are **unsigned**. Windows SmartScreen may warn; verify SHA-256 checksums from `SHA256SUMS.txt`. PixelForge 1.0.0 was also unsigned.
 
 ## Code signing policy
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+Free code signing is provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). **No PixelForge release published to date is signed.** PixelForge 1.0.0 was unsigned, and v2.0.0 is also published **unsigned**: SignPath enrollment and the GitHub secret/variables are not configured, so no signing request was submitted for v2.0.0. Windows SmartScreen may warn; verify the SHA-256 checksums in `SHA256SUMS.txt` before running any installer. Existing 1.0.0 assets are unchanged.
 
 | Role | Member |
 |---|---|
@@ -357,9 +406,7 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 | Reviewer | [JuggyBob](https://github.com/JuggyBob) |
 | Approver | [JuggyBob](https://github.com/JuggyBob) |
 
-Release builds run on GitHub-hosted runners, are submitted to SignPath, and require manual approval for every signing request. The application executable and the setup executable are Authenticode-signed and timestamped; the executable inside the portable ZIP is signed as well. The certificate is issued to SignPath Foundation, so Windows displays SignPath Foundation as the publisher.
-
-PixelForge 1.0.0 predates enrollment and remains unsigned. Existing release assets will not be replaced; signed binaries will be published in a later version after approval. See [CODE_SIGNING.md](CODE_SIGNING.md) for the complete policy and [docs/SIGNPATH.md](docs/SIGNPATH.md) for the setup and release procedure.
+When SignPath is configured, a future release will be the first signed one: GitHub-hosted runners build the app, SignPath signs `PixelForge.exe`, the installer and portable ZIP are rebuilt around the signed app, the setup EXE is signed, and checksums are generated after signing. Every signing request needs manual approval. The certificate is issued to SignPath Foundation, so Windows will display SignPath Foundation as the publisher. **Do not assume the v2.0.0 assets are signed.** See [CODE_SIGNING.md](CODE_SIGNING.md) and [docs/SIGNPATH.md](docs/SIGNPATH.md).
 
 ## Contributing
 

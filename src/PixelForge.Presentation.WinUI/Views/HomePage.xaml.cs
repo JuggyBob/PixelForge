@@ -5,18 +5,22 @@ using Microsoft.UI.Xaml.Navigation;
 using XamlApplication = Microsoft.UI.Xaml.Application;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class HomePage : Page
+public sealed partial class HomePage : Page, ILocalizationAwarePage
 {
     public HomeViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public HomePage()
     {
         ViewModel = App.Services.GetRequiredService<HomeViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -36,7 +40,7 @@ public sealed partial class HomePage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Import into PixelForge";
+            e.DragUIOverride.Caption = LocalizationService.T("Import into PixelForge");
             e.DragUIOverride.IsContentVisible = true;
             HeroDropZone.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)XamlApplication.Current.Resources["AccentPrimaryBrush"];
             HeroDropZone.BorderThickness = new Thickness(2);

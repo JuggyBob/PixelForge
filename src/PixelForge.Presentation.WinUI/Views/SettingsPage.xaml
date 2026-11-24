@@ -4,6 +4,7 @@
     x:Class="PixelForge.Presentation.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     xmlns:controls="using:PixelForge.Presentation.Controls"
     NavigationCacheMode="Required"
     Background="Transparent">
@@ -20,14 +21,14 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
-                <TextBlock Text="Settings" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="SettingsTitle" />
-                <TextBlock Text="Appearance, defaults, engines and local storage — all persisted on this PC."
+                <TextBlock loc:Loc.Text="Settings" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="SettingsTitle" />
+                <TextBlock loc:Loc.Text="Appearance, defaults, engines and local storage — all persisted on this PC."
                            Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
             <Border Grid.Column="1" Style="{StaticResource StatusPillStyle}" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="7">
                     <Ellipse Width="7" Height="7" Fill="{ThemeResource SuccessBrush}" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding SaveStatus}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{Binding SaveStatus, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
         </Grid>
@@ -41,7 +42,7 @@
             <Border Grid.Column="0" Style="{StaticResource SectionCardStyle}" Padding="8">
                 <ListView ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
                           SelectionMode="Single" Background="Transparent" Padding="0"
-                          AutomationProperties.AutomationId="SettingsSections" AutomationProperties.Name="Settings sections">
+                          AutomationProperties.AutomationId="SettingsSections" loc:Loc.AutomationName="Settings sections">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -53,7 +54,7 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <FontIcon Glyph="{Binding Glyph}" FontSize="15" Width="20" />
-                                <TextBlock Text="{Binding Label}" FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding DisplayLabel}" FontSize="13" VerticalAlignment="Center" />
                             </StackPanel>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -65,16 +66,48 @@
                     <!-- General -->
                     <StackPanel Spacing="14" Visibility="{Binding IsGeneral, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
+                            <StackPanel Spacing="12">
+                                <StackPanel Spacing="2">
+                                    <TextBlock loc:Loc.Text="Language" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Choose the language used across PixelForge. Changes apply immediately."
+                                               Style="{StaticResource CaptionTextStyle}" />
+                                </StackPanel>
+                                <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch"
+                                          AutomationProperties.AutomationId="LanguageCombo"
+                                          loc:Loc.AutomationName="Language">
+                                    <ComboBox.ItemContainerStyle>
+                                        <Style TargetType="ComboBoxItem">
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding NativeName}" />
+                                        </Style>
+                                    </ComboBox.ItemContainerStyle>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="10"
+                                                        AutomationProperties.Name="{Binding NativeName}">
+                                                <Border Width="26" Height="18" CornerRadius="3" Background="{ThemeResource SubtleSurfaceBrush}">
+                                                    <Image Source="{Binding FlagAsset}" Width="26" Height="18"
+                                                           Stretch="UniformToFill" />
+                                                </Border>
+                                                <TextBlock Text="{Binding NativeName, Converter={StaticResource Localize}}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="14">
-                                <TextBlock Text="Appearance" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Appearance" Style="{StaticResource SectionTitleTextStyle}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Theme" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Theme" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch"
-                                              AutomationProperties.Name="Theme" AutomationProperties.AutomationId="ThemeCombo" />
+                                              DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch"
+                                              loc:Loc.AutomationName="Theme" AutomationProperties.AutomationId="ThemeCombo" />
                                 </StackPanel>
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="Accent colour" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Accent colour" Style="{StaticResource CaptionTextStyle}" />
                                     <ItemsControl ItemsSource="{Binding AccentSwatches}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -87,8 +120,8 @@
                                                         Background="{Binding Hex, Converter={StaticResource HexToBrush}}"
                                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                                         Command="{Binding DataContext.SetAccentCommand, ElementName=SettingsRoot}"
-                                                        CommandParameter="{Binding Hex}" ToolTipService.ToolTip="{Binding Name}"
-                                                        AutomationProperties.Name="{Binding Name}" />
+                                                        CommandParameter="{Binding Hex}" ToolTipService.ToolTip="{Binding Name, Converter={StaticResource Localize}}"
+                                                        AutomationProperties.Name="{Binding Name, Converter={StaticResource Localize}}" />
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
@@ -100,13 +133,13 @@
                                         </Grid.ColumnDefinitions>
                                         <Button Width="40" Height="40" Padding="0" CornerRadius="9"
                                                 Background="Transparent" BorderThickness="0"
-                                                ToolTipService.ToolTip="Choose accent colour"
-                                                AutomationProperties.Name="Choose accent colour"
+                                                loc:Loc.ToolTip="Choose accent colour"
+                                                loc:Loc.AutomationName="Choose accent colour"
                                                 AutomationProperties.AutomationId="AccentSwatchPicker">
                                             <Button.Flyout>
                                                 <Flyout x:Name="AccentColorFlyout" Placement="Bottom">
                                                     <StackPanel Width="300" Spacing="12">
-                                                        <TextBlock Text="Pick an accent colour" FontSize="15" FontWeight="SemiBold" />
+                                                        <TextBlock loc:Loc.Text="Pick an accent colour" FontSize="15" FontWeight="SemiBold" />
                                                         <controls:ColorWheel x:Name="AccentColorWheel"
                                                                              Color="{Binding AccentColor, Mode=OneWay}"
                                                                              ColorChanged="OnAccentWheelColorChanged"
@@ -117,30 +150,30 @@
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="*" />
                                                             </Grid.ColumnDefinitions>
-                                                            <NumberBox Header="Red" Minimum="0" Maximum="255" SmallChange="1"
+                                                            <NumberBox loc:Loc.Header="Red" Minimum="0" Maximum="255" SmallChange="1"
                                                                        SpinButtonPlacementMode="Compact"
                                                                        Value="{Binding AccentRed, Mode=TwoWay}"
-                                                                       AutomationProperties.Name="Accent red" />
-                                                            <NumberBox Grid.Column="1" Header="Green" Minimum="0" Maximum="255" SmallChange="1"
+                                                                       loc:Loc.AutomationName="Accent red" />
+                                                            <NumberBox Grid.Column="1" loc:Loc.Header="Green" Minimum="0" Maximum="255" SmallChange="1"
                                                                        SpinButtonPlacementMode="Compact"
                                                                        Value="{Binding AccentGreen, Mode=TwoWay}"
-                                                                       AutomationProperties.Name="Accent green" />
-                                                            <NumberBox Grid.Column="2" Header="Blue" Minimum="0" Maximum="255" SmallChange="1"
+                                                                       loc:Loc.AutomationName="Accent green" />
+                                                            <NumberBox Grid.Column="2" loc:Loc.Header="Blue" Minimum="0" Maximum="255" SmallChange="1"
                                                                        SpinButtonPlacementMode="Compact"
                                                                        Value="{Binding AccentBlue, Mode=TwoWay}"
-                                                                       AutomationProperties.Name="Accent blue" />
+                                                                       loc:Loc.AutomationName="Accent blue" />
                                                         </Grid>
                                                         <StackPanel Spacing="4">
-                                                            <TextBlock Text="HEX" Style="{StaticResource CaptionTextStyle}" />
+                                                            <TextBlock loc:Loc.Text="HEX" Style="{StaticResource CaptionTextStyle}" />
                                                             <TextBox Text="{Binding AccentHex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     PlaceholderText="#D2693A"
-                                                                     AutomationProperties.Name="Accent HEX colour in picker"
+                                                                     loc:Loc.Placeholder="#D2693A"
+                                                                     loc:Loc.AutomationName="Accent HEX colour in picker"
                                                                      AutomationProperties.AutomationId="AccentHexPicker" />
                                                         </StackPanel>
                                                         <Grid>
-                                                            <TextBlock Text="Changes apply live and are saved automatically."
+                                                            <TextBlock loc:Loc.Text="Changes apply live and are saved automatically."
                                                                        Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
-                                                            <Button Content="Done" HorizontalAlignment="Right"
+                                                            <Button loc:Loc.Content="Done" HorizontalAlignment="Right"
                                                                     Style="{StaticResource SecondaryButtonStyle}"
                                                                     Click="OnAccentColorDoneClick"
                                                                     AutomationProperties.AutomationId="AccentColorDone" />
@@ -153,48 +186,48 @@
                                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" />
                                         </Button>
                                         <TextBox Grid.Column="1" Text="{Binding AccentHex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                 PlaceholderText="#D2693A" AutomationProperties.Name="Custom accent HEX colour"
+                                                 loc:Loc.Placeholder="#D2693A" loc:Loc.AutomationName="Custom accent HEX colour"
                                                  AutomationProperties.AutomationId="AccentHexInput" />
-                                        <Button Grid.Column="2" Content="Apply" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="2" loc:Loc.Content="Apply" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ApplyAccentHexCommand}"
                                                 AutomationProperties.AutomationId="AccentApply" />
                                     </Grid>
-                                    <TextBlock Text="Use a six or eight digit HEX colour. Contrast is checked automatically."
+                                    <TextBlock loc:Loc.Text="Use a six or eight digit HEX colour. Contrast is checked automatically."
                                                Style="{StaticResource CaptionTextStyle}" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Interface font" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Interface font" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding AvailableFonts}" SelectedItem="{Binding SelectedFont, Mode=TwoWay}"
-                                              HorizontalAlignment="Stretch" AutomationProperties.Name="Interface font"
+                                              HorizontalAlignment="Stretch" loc:Loc.AutomationName="Interface font"
                                               AutomationProperties.AutomationId="FontCombo" />
                                     <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="7" Padding="12,8" Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding FontPreview}" FontSize="14" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding FontPreview, Converter={StaticResource Localize}}" FontSize="14" TextWrapping="Wrap" />
                                     </Border>
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Technical / monospace font" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Technical / monospace font" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding AvailableFonts}" SelectedItem="{Binding SelectedMonoFont, Mode=TwoWay}"
-                                              HorizontalAlignment="Stretch" AutomationProperties.Name="Technical font"
+                                              HorizontalAlignment="Stretch" loc:Loc.AutomationName="Technical font"
                                               AutomationProperties.AutomationId="MonoFontCombo" />
                                     <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="7" Padding="12,8" Margin="0,4,0,0">
-                                        <TextBlock Text="{Binding MonoPreview}" FontFamily="{ThemeResource AppMonoFontFamily}" FontSize="12" />
+                                        <TextBlock Text="{Binding MonoPreview, Converter={StaticResource Localize}}" FontFamily="{ThemeResource AppMonoFontFamily}" FontSize="12" />
                                     </Border>
                                 </StackPanel>
                                 <StackPanel Spacing="6">
                                     <Grid>
-                                        <TextBlock Text="Font size" Style="{StaticResource CaptionTextStyle}" />
-                                        <TextBlock Text="{Binding FontScalePercent}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Font size" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock Text="{Binding FontScalePercent, Converter={StaticResource Localize}}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
                                     </Grid>
                                     <Slider Minimum="85" Maximum="135" StepFrequency="5" Value="{Binding FontScalePercent, Mode=TwoWay}"
-                                            AutomationProperties.Name="Font size percentage" AutomationProperties.AutomationId="FontScaleSlider" />
-                                    <Button Content="Reset typography" Style="{StaticResource SubtleButtonStyle}" Command="{Binding ResetFontCommand}" />
+                                            loc:Loc.AutomationName="Font size percentage" AutomationProperties.AutomationId="FontScaleSlider" />
+                                    <Button loc:Loc.Content="Reset typography" Style="{StaticResource SubtleButtonStyle}" Command="{Binding ResetFontCommand}" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Default output" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Default output" Style="{StaticResource SectionTitleTextStyle}" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -202,15 +235,15 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBox Text="{Binding DefaultOutputDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ChooseDefaultOutputCommand}" />
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ChooseDefaultOutputCommand}" />
                                     <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding OpenFolderCommand}" CommandParameter="{Binding DefaultOutputDirectory}">
                                         <FontIcon Glyph="&#xE8B7;" FontSize="13" />
                                     </Button>
                                 </Grid>
-                                <ToggleSwitch Header="Show in-app notifications when jobs finish" IsOn="{Binding ShowNotifications, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Confirm before replacing existing files" IsOn="{Binding ConfirmOverwrite, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Remember the last page on startup" IsOn="{Binding RememberLastPage, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Open the output folder after a successful job" IsOn="{Binding OpenOutputAfterJob, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Show in-app notifications when jobs finish" IsOn="{Binding ShowNotifications, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Confirm before replacing existing files" IsOn="{Binding ConfirmOverwrite, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Remember the last page on startup" IsOn="{Binding RememberLastPage, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Open the output folder after a successful job" IsOn="{Binding OpenOutputAfterJob, Mode=TwoWay}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -219,50 +252,50 @@
                     <StackPanel Spacing="14" Visibility="{Binding IsConverter, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Converter defaults" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Converter defaults" Style="{StaticResource SectionTitleTextStyle}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Image format" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Image format" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding ImageFormats}" SelectedItem="{Binding SelectedImageFormat, Mode=TwoWay}"
                                               DisplayMemberPath="DisplayName" />
                                 </StackPanel>
                                 <StackPanel Spacing="6">
                                     <Grid>
-                                        <TextBlock Text="Default image quality" Style="{StaticResource CaptionTextStyle}" />
-                                        <TextBlock Text="{Binding ImageQuality}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Default image quality" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock Text="{Binding ImageQuality, Converter={StaticResource Localize}}" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
                                     </Grid>
                                     <Slider Minimum="1" Maximum="100" StepFrequency="1" Value="{Binding ImageQuality, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Audio format" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Audio format" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding AudioFormats}" SelectedItem="{Binding SelectedAudioFormat, Mode=TwoWay}"
                                               DisplayMemberPath="DisplayName" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Audio bitrate" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Audio bitrate" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding AudioBitrateOptions}" SelectedItem="{Binding SelectedAudioBitrate, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Video container" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Video container" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding VideoFormats}" SelectedItem="{Binding SelectedVideoFormat, Mode=TwoWay}"
                                               DisplayMemberPath="DisplayName" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Video codec" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Video codec" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding VideoCodecs}" SelectedItem="{Binding SelectedVideoCodec, Mode=TwoWay}"
                                               DisplayMemberPath="DisplayName" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Video quality preset" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Video quality preset" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding VideoPresets}" SelectedItem="{Binding SelectedVideoPreset, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Default collision policy" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Default collision policy" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedCollision, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
-                                <ToggleSwitch Header="Preserve metadata by default" IsOn="{Binding ConverterPreserveMetadata, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Preserve metadata by default" IsOn="{Binding ConverterPreserveMetadata, Mode=TwoWay}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -271,11 +304,11 @@
                     <StackPanel Spacing="14" Visibility="{Binding IsOcr, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="OCR documents" Style="{StaticResource SectionTitleTextStyle}" />
-                                <TextBlock Text="Defaults for the OCR Documents workspace. Individual jobs can override them."
+                                <TextBlock loc:Loc.Text="OCR documents" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Defaults for the OCR Documents workspace. Individual jobs can override them."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Default recognition model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Default recognition model" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -283,35 +316,36 @@
                                         </Grid.ColumnDefinitions>
                                         <ComboBox ItemsSource="{Binding OcrModels}" SelectedItem="{Binding SelectedOcrModel, Mode=TwoWay}"
                                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch"
-                                                  AutomationProperties.Name="Default OCR model" />
-                                        <Button Grid.Column="1" Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
+                                                  loc:Loc.AutomationName="Default OCR model" />
+                                        <Button Grid.Column="1" loc:Loc.Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ManageOcrModelsCommand}" />
                                     </Grid>
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Execution provider preference" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Execution provider preference" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding OcrProviders}" SelectedItem="{Binding SelectedOcrProvider, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch"
-                                              AutomationProperties.Name="OCR execution provider" />
-                                    <TextBlock Text="{Binding OcrProviderStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                    <TextBlock Text="DirectML is reported only after a session actually initializes on it. If the graph or driver falls back, the job and log report CPU execution."
+                                              DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch"
+                                              loc:Loc.AutomationName="OCR execution provider" />
+                                    <TextBlock Text="{Binding OcrProviderStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock loc:Loc.Text="DirectML is reported only after a session actually initializes on it. If the graph or driver falls back, the job and log report CPU execution."
                                                Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <ToggleSwitch Header="Generate PDF companion by default" IsOn="{Binding OcrGeneratePdf, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Preprocess page images by default" IsOn="{Binding OcrPreprocess, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Generate PDF companion by default" IsOn="{Binding OcrGeneratePdf, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Preprocess page images by default" IsOn="{Binding OcrPreprocess, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Review recognized text before export by default" IsOn="{Binding OcrReviewBeforeExport, Mode=TwoWay}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Default OCR output folder" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Default OCR output folder" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox Text="{Binding OcrOutputDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ChooseOcrOutputCommand}" />
                                     </Grid>
                                 </StackPanel>
-                                <TextBlock Text="OCR runs entirely on this PC. All three PP-OCRv6 models have been inference-tested on DirectML and CPU; optional advanced models run through llama.cpp Vulkan. The engine reports the provider that actually ran."
+                                <TextBlock loc:Loc.Text="OCR runs entirely on this PC. All three PP-OCRv6 models have been inference-tested on DirectML and CPU; optional advanced models run through llama.cpp Vulkan. The engine reports the provider that actually ran."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
@@ -321,19 +355,19 @@
                     <StackPanel Spacing="14" Visibility="{Binding IsUpscaler, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Upscaler defaults" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Upscaler defaults" Style="{StaticResource SectionTitleTextStyle}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Preferred method" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Preferred method" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding UpscaleMethods}" SelectedItem="{Binding SelectedUpscaleMethod, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Traditional algorithm" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Traditional algorithm" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding Algorithms}" SelectedItem="{Binding SelectedUpscaleAlgorithm, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="AI model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="AI model" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -341,15 +375,15 @@
                                         </Grid.ColumnDefinitions>
                                         <ComboBox ItemsSource="{Binding AvailableModels}" SelectedItem="{Binding SelectedUpscaleModel, Mode=TwoWay}"
                                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Column="1" Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="1" loc:Loc.Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ManageModelsCommand}" />
                                     </Grid>
-                                    <TextBlock Text="{Binding ModelStatusText}" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding ModelStatusText, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding ProviderKinds}" SelectedItem="{Binding SelectedProviderKind, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -357,14 +391,14 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="Preferred scale" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Preferred scale" Style="{StaticResource CaptionTextStyle}" />
                                         <ComboBox ItemsSource="{Binding ScaleOptions}" SelectedItem="{Binding SelectedUpscaleScale, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label" />
+                                                  DisplayMemberPath="DisplayLabel" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="Output format" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Output format" Style="{StaticResource CaptionTextStyle}" />
                                         <ComboBox ItemsSource="{Binding UpscaleFormats}" SelectedItem="{Binding SelectedUpscaleFormat, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label" />
+                                                  DisplayMemberPath="DisplayLabel" />
                                     </StackPanel>
                                 </Grid>
                                 <Grid ColumnSpacing="8">
@@ -372,19 +406,19 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <NumberBox Header="Tile size (0 = auto)" Minimum="0" Maximum="2048" SmallChange="32"
+                                    <NumberBox loc:Loc.Header="Tile size (0 = auto)" Minimum="0" Maximum="2048" SmallChange="32"
                                                SpinButtonPlacementMode="Compact" Value="{Binding UpscaleTileSize, Mode=TwoWay}" />
-                                    <NumberBox Grid.Column="1" Header="Overlap" Minimum="0" Maximum="512" SmallChange="8"
+                                    <NumberBox Grid.Column="1" loc:Loc.Header="Overlap" Minimum="0" Maximum="512" SmallChange="8"
                                                SpinButtonPlacementMode="Compact" Value="{Binding UpscaleOverlap, Mode=TwoWay}" />
                                 </Grid>
-                                <TextBox Header="Filename suffix" Text="{Binding UpscaleSuffix, Mode=TwoWay}" PlaceholderText="auto, e.g. _4x" />
+                                <TextBox loc:Loc.Header="Filename suffix" Text="{Binding UpscaleSuffix, Mode=TwoWay}" loc:Loc.Placeholder="auto, e.g. _4x" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Header="Model folder" Text="{Binding ModelDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <TextBox loc:Loc.Header="Model folder" Text="{Binding ModelDirectory, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseModelFolderCommand}" VerticalAlignment="Bottom" />
                                 </Grid>
                                 <Grid ColumnSpacing="8">
@@ -393,27 +427,27 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Header="Upscale output folder" Text="{Binding UpscaleOutputDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <TextBox loc:Loc.Header="Upscale output folder" Text="{Binding UpscaleOutputDirectory, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseUpscaleOutputCommand}" VerticalAlignment="Bottom" />
                                     <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding OpenFolderCommand}"
                                             CommandParameter="{Binding UpscaleOutputDirectory}" VerticalAlignment="Bottom">
                                         <FontIcon Glyph="&#xE8B7;" FontSize="13" />
                                     </Button>
                                 </Grid>
-                                <ToggleSwitch Header="Include subfolders when scanning" IsOn="{Binding UpscaleIncludeSubfolders, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Preserve relative folder structure" IsOn="{Binding UpscalePreserveStructure, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Include subfolders when scanning" IsOn="{Binding UpscaleIncludeSubfolders, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Preserve relative folder structure" IsOn="{Binding UpscalePreserveStructure, Mode=TwoWay}" />
                             </StackPanel>
                         </Border>
 
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Video Upscaler defaults" Style="{StaticResource SectionTitleTextStyle}" />
-                                <TextBlock Text="These values seed the Video Upscaler when it is first opened in a session. Individual jobs can still override them."
+                                <TextBlock loc:Loc.Text="Video Upscaler defaults" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="These values seed the Video Upscaler when it is first opened in a session. Individual jobs can still override them."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <ToggleSwitch Header="Enable frame-wise super-resolution by default" IsOn="{Binding VideoEnableSuperResolution, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Enable frame-wise super-resolution by default" IsOn="{Binding VideoEnableSuperResolution, Mode=TwoWay}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Default super-resolution model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Default super-resolution model" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -421,18 +455,18 @@
                                         </Grid.ColumnDefinitions>
                                         <ComboBox ItemsSource="{Binding VideoModels}" SelectedItem="{Binding SelectedVideoModel, Mode=TwoWay}"
                                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Column="1" Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="1" loc:Loc.Content="AI Models" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ManageModelsCommand}" />
                                     </Grid>
-                                    <TextBlock Text="{Binding VideoModelStatus}" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding VideoModelStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" />
                                 </StackPanel>
-                                <ToggleSwitch Header="Enable frame interpolation by default" IsOn="{Binding VideoEnableInterpolation, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Enable frame interpolation by default" IsOn="{Binding VideoEnableInterpolation, Mode=TwoWay}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Default interpolation model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Default interpolation model" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding VideoInterpolationModels}"
                                               SelectedItem="{Binding SelectedVideoInterpolationModel, Mode=TwoWay}"
                                               DisplayMemberPath="Name" />
-                                    <TextBlock Text="{Binding VideoInterpolationStatus}" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding VideoInterpolationStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" />
                                 </StackPanel>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -440,42 +474,42 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="Default frame-rate multiplier" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Default frame-rate multiplier" Style="{StaticResource CaptionTextStyle}" />
                                         <ComboBox ItemsSource="{Binding VideoFrameRates}" SelectedItem="{Binding SelectedVideoFrameRate, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label" />
+                                                  DisplayMemberPath="DisplayLabel" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Spacing="4">
-                                        <TextBlock Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
                                         <ComboBox ItemsSource="{Binding ProviderKinds}" SelectedItem="{Binding SelectedVideoProviderKind, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label" />
+                                                  DisplayMemberPath="DisplayLabel" />
                                     </StackPanel>
                                 </Grid>
-                                <NumberBox Header="Video bitrate (kbps)" Minimum="100" Maximum="200000" SmallChange="500"
+                                <NumberBox loc:Loc.Header="Video bitrate (kbps)" Minimum="100" Maximum="200000" SmallChange="500"
                                            SpinButtonPlacementMode="Compact" Value="{Binding VideoBitrateKbps, Mode=TwoWay}" />
-                                <TextBox Header="Filename suffix" Text="{Binding VideoSuffix, Mode=TwoWay}" PlaceholderText="_upscaled" />
+                                <TextBox loc:Loc.Header="Filename suffix" Text="{Binding VideoSuffix, Mode=TwoWay}" loc:Loc.Placeholder="_upscaled" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Header="Video output folder" Text="{Binding VideoOutputDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <TextBox loc:Loc.Header="Video output folder" Text="{Binding VideoOutputDirectory, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseVideoOutputCommand}" VerticalAlignment="Bottom" />
                                     <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding OpenFolderCommand}"
                                             CommandParameter="{Binding VideoOutputDirectory}" VerticalAlignment="Bottom">
                                         <FontIcon Glyph="&#xE8B7;" FontSize="13" />
                                     </Button>
                                 </Grid>
-                                <ToggleSwitch Header="Include subfolders when scanning" IsOn="{Binding VideoIncludeSubfolders, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Include subfolders when scanning" IsOn="{Binding VideoIncludeSubfolders, Mode=TwoWay}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="If an output file already exists" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="If an output file already exists" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedVideoCollision, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" />
+                                              DisplayMemberPath="DisplayLabel" />
                                 </StackPanel>
-                                <TextBlock Text="Output is MP4/H.264. Audio is copied when MP4-compatible, otherwise encoded as AAC."
+                                <TextBlock loc:Loc.Text="Output is MP4/H.264. Audio is copied when MP4-compatible, otherwise encoded as AAC."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <Button Content="Reset video defaults" Style="{StaticResource SecondaryButtonStyle}"
+                                <Button loc:Loc.Content="Reset video defaults" Style="{StaticResource SecondaryButtonStyle}"
                                         Command="{Binding ResetVideoDefaultsCommand}" HorizontalAlignment="Left" />
                             </StackPanel>
                         </Border>
@@ -485,15 +519,15 @@
                     <StackPanel Spacing="14" Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Processing &amp; concurrency" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="Processing &amp; concurrency" Style="{StaticResource SectionTitleTextStyle}" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <NumberBox Header="Maximum concurrent jobs" Minimum="1" Maximum="8" SmallChange="1"
+                                    <NumberBox loc:Loc.Header="Maximum concurrent jobs" Minimum="1" Maximum="8" SmallChange="1"
                                                SpinButtonPlacementMode="Compact" Value="{Binding MaxConcurrentJobs, Mode=TwoWay}" />
-                                    <NumberBox Grid.Column="1" Header="GPU inference concurrency" Minimum="1" Maximum="2" SmallChange="1"
+                                    <NumberBox Grid.Column="1" loc:Loc.Header="GPU inference concurrency" Minimum="1" Maximum="2" SmallChange="1"
                                                SpinButtonPlacementMode="Compact" Value="{Binding GpuConcurrency, Mode=TwoWay}" />
                                 </Grid>
                                 <Grid ColumnSpacing="8">
@@ -501,14 +535,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Header="Temporary directory" Text="{Binding TempDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <TextBox loc:Loc.Header="Temporary directory" Text="{Binding TempDirectory, Mode=TwoWay}" />
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseTempFolderCommand}" VerticalAlignment="Bottom" />
                                 </Grid>
-                                <ToggleSwitch Header="Clean up temporary files on exit" IsOn="{Binding CleanupTempOnExit, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Keep temporary output on failure" IsOn="{Binding KeepTempOnFailure, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Clean up temporary files on exit" IsOn="{Binding CleanupTempOnExit, Mode=TwoWay}" />
+                                <ToggleSwitch loc:Loc.Header="Keep temporary output on failure" IsOn="{Binding KeepTempOnFailure, Mode=TwoWay}" />
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="Log level" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Log level" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding LogLevels}" SelectedItem="{Binding LogLevel, Mode=TwoWay}" />
                                 </StackPanel>
                             </StackPanel>
@@ -519,31 +553,31 @@
                     <StackPanel Spacing="14" Visibility="{Binding IsStorage, Converter={StaticResource BoolToVisibility}}">
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="History &amp; cache" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock loc:Loc.Text="History &amp; cache" Style="{StaticResource SectionTitleTextStyle}" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <NumberBox Header="History retention (days, 0 = forever)" Minimum="0" Maximum="3650"
+                                    <NumberBox loc:Loc.Header="History retention (days, 0 = forever)" Minimum="0" Maximum="3650"
                                                SpinButtonPlacementMode="Compact" Value="{Binding HistoryRetentionDays, Mode=TwoWay}" />
-                                    <NumberBox Grid.Column="1" Header="Maximum history entries" Minimum="100" Maximum="100000"
+                                    <NumberBox Grid.Column="1" loc:Loc.Header="Maximum history entries" Minimum="100" Maximum="100000"
                                                SpinButtonPlacementMode="Compact" Value="{Binding MaxHistoryEntries, Mode=TwoWay}" />
                                 </Grid>
-                                <ToggleSwitch Header="Store operation history in SQLite" IsOn="{Binding SaveJobHistory, Mode=TwoWay}" />
-                                <TextBlock Text="History never stores copies of your media. It records filenames, settings, sizes, status and verification summaries."
+                                <ToggleSwitch loc:Loc.Header="Store operation history in SQLite" IsOn="{Binding SaveJobHistory, Mode=TwoWay}" />
+                                <TextBlock loc:Loc.Text="History never stores copies of your media. It records filenames, settings, sizes, status and verification summaries."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Clear history" Style="{StaticResource DangerButtonStyle}" Command="{Binding ClearHistoryCommand}" />
-                                    <Button Content="Clear thumbnail cache" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearThumbnailCacheCommand}" />
-                                    <Button Content="Clean temporary files" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CleanupTempCommand}" />
+                                    <Button loc:Loc.Content="Clear history" Style="{StaticResource DangerButtonStyle}" Command="{Binding ClearHistoryCommand}" />
+                                    <Button loc:Loc.Content="Clear thumbnail cache" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ClearThumbnailCacheCommand}" />
+                                    <Button loc:Loc.Content="Clean temporary files" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CleanupTempCommand}" />
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Open logs" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
+                                    <Button loc:Loc.Content="Open logs" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
                                             CommandParameter="{Binding LogsPath}" />
-                                    <Button Content="Open models" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
+                                    <Button loc:Loc.Content="Open models" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
                                             CommandParameter="{Binding ModelDirectory}" />
-                                    <Button Content="Open temp" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
+                                    <Button loc:Loc.Content="Open temp" Style="{StaticResource SubtleButtonStyle}" Command="{Binding OpenFolderCommand}"
                                             CommandParameter="{Binding TempDirectory}" />
                                 </StackPanel>
                             </StackPanel>
@@ -555,23 +589,23 @@
                         <Border Style="{StaticResource SectionCardStyle}">
                             <StackPanel Spacing="12">
                                 <Grid>
-                                    <TextBlock Text="Engine diagnostics" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Engine diagnostics" Style="{StaticResource SectionTitleTextStyle}" />
                                     <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-                                        <Button Content="Refresh" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding RefreshDiagnosticsRelayCommand}"
+                                        <Button loc:Loc.Content="Refresh" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding RefreshDiagnosticsRelayCommand}"
                                                 AutomationProperties.AutomationId="DiagnosticsRefresh" />
-                                        <Button Content="Copy report" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CopyDiagnosticsCommand}"
+                                        <Button loc:Loc.Content="Copy report" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CopyDiagnosticsCommand}"
                                                 AutomationProperties.AutomationId="DiagnosticsCopy" />
                                     </StackPanel>
                                 </Grid>
                                 <ProgressRing IsActive="{Binding IsDiagnosticsLoading}" Width="18" Height="18" HorizontalAlignment="Left"
                                               Visibility="{Binding IsDiagnosticsLoading, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Text="System" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding SystemSummary}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="Engines" FontWeight="SemiBold" Margin="0,6,0,0" />
-                                <TextBlock Text="{Binding EngineSummary}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="Detected capabilities" FontWeight="SemiBold" Margin="0,6,0,0" />
-                                <TextBlock Text="{Binding CodecSummary}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding DiagnosticsReport}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap"
+                                <TextBlock loc:Loc.Text="System" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding SystemSummary, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock loc:Loc.Text="Engines" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding EngineSummary, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock loc:Loc.Text="Detected capabilities" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding CodecSummary, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding DiagnosticsReport, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap"
                                            MaxHeight="240" IsTextSelectionEnabled="True" />
                             </StackPanel>
                         </Border>
@@ -584,17 +618,52 @@
                                 <StackPanel Orientation="Horizontal" Spacing="14">
                                     <Image Source="ms-appx:///Assets/Logo.png" Width="64" Height="64" />
                                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="PixelForge" FontSize="22" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding AboutVersion}" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="PixelForge" FontSize="22" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding AboutVersion, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" />
                                     </StackPanel>
                                 </StackPanel>
-                                <TextBlock Text="A local Windows media studio for image, audio and video conversion, with traditional and AI image upscaling."
+                                <Border Style="{StaticResource SectionCardStyle}">
+                                    <StackPanel Spacing="10">
+                                        <Grid>
+                                            <TextBlock loc:Loc.Text="Software update" Style="{StaticResource SectionTitleTextStyle}" />
+                                            <TextBlock Text="{Binding UpdateCurrentVersion, Converter={StaticResource Localize}}" HorizontalAlignment="Right"
+                                                       Style="{StaticResource CaptionTextStyle}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding UpdateStatus, Converter={StaticResource Localize}}" Style="{StaticResource SecondaryTextStyle}"
+                                                   TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <Button loc:Loc.Content="Check for updates" Style="{StaticResource SecondaryButtonStyle}"
+                                                    Command="{Binding CheckForUpdatesCommand}"
+                                                    AutomationProperties.AutomationId="CheckForUpdatesButton" />
+                                            <ProgressRing IsActive="{Binding IsUpdateChecking}" Width="18" Height="18"
+                                                          Visibility="{Binding IsUpdateChecking, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                        <ToggleSwitch loc:Loc.Header="Automatically check for updates on startup"
+                                                      IsOn="{Binding CheckForUpdatesOnStartup, Mode=TwoWay}"
+                                                      AutomationProperties.AutomationId="AutoUpdateToggle" />
+                                        <StackPanel Spacing="8"
+                                                    Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding UpdateReleaseTitle, Converter={StaticResource Localize}}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding UpdateReleaseNotes, Converter={StaticResource Localize}}" Style="{StaticResource SecondaryTextStyle}"
+                                                       TextWrapping="Wrap" MaxHeight="180" IsTextSelectionEnabled="True" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button Content="{Binding UpdateDownloadLabel, Converter={StaticResource Localize}}" Style="{StaticResource PrimaryButtonStyle}"
+                                                        Command="{Binding DownloadUpdateCommand}"
+                                                        AutomationProperties.AutomationId="UpdateDownloadButton" />
+                                                <Button loc:Loc.Content="View release" Style="{StaticResource SecondaryButtonStyle}"
+                                                        Command="{Binding OpenUpdateReleaseCommand}"
+                                                        AutomationProperties.AutomationId="UpdateReleaseButton" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock loc:Loc.Text="A local Windows media studio for image, audio and video conversion, with traditional and AI image upscaling."
                                            Style="{StaticResource SecondaryTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="No account. No upload. No mandatory online service. FFmpeg, ImageMagick, ONNX Runtime and the bundled typefaces are redistributed under their respective licenses; see THIRD-PARTY-NOTICES.md in the installation folder."
+                                <TextBlock loc:Loc.Text="No account. No upload. No mandatory online service. FFmpeg, ImageMagick, ONNX Runtime and the bundled typefaces are redistributed under their respective licenses; see THIRD-PARTY-NOTICES.md in the installation folder."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="Real-ESRGAN model weights are BSD-3-Clause. Models are downloaded explicitly by the user and verified by SHA-256 before use."
+                                <TextBlock loc:Loc.Text="Real-ESRGAN model weights are BSD-3-Clause. Models are downloaded explicitly by the user and verified by SHA-256 before use."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <Button Content="Open notices" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding OpenNoticesCommand}"
+                                <Button loc:Loc.Content="Open notices" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding OpenNoticesCommand}"
                                         AutomationProperties.AutomationId="OpenNoticesButton" />
                             </StackPanel>
                         </Border>

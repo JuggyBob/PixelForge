@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Controls.ColorWheel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     Background="Transparent">
 
     <Grid x:Name="WheelRoot"
@@ -15,8 +16,8 @@
           PointerReleased="OnPointerReleased"
           PointerCaptureLost="OnPointerCaptureLost"
           KeyDown="OnKeyDown"
-          AutomationProperties.Name="Colour wheel"
-          AutomationProperties.HelpText="Choose hue and saturation. Arrow keys adjust the selected colour.">
+          loc:Loc.AutomationName="Colour wheel"
+          loc:Loc.HelpText="Choose hue and saturation. Arrow keys adjust the selected colour.">
         <Canvas x:Name="WheelCanvas" Width="200" Height="200"
                 HorizontalAlignment="Center" VerticalAlignment="Center"
                 IsHitTestVisible="False" />

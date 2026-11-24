@@ -607,7 +607,7 @@ public sealed class JobValidator
             try
             {
                 var path = _outputPaths.BuildOutputPath(input.Path, request.Settings.OutputDirectory, extension, suffix,
-                    input.RelativeDirectory, request.Settings.CollisionPolicy, out var note);
+                    input.RelativeDirectory, request.Settings.CollisionPolicy, out var note, input.PreferredOutputName);
                 if (!string.IsNullOrWhiteSpace(note) && note.Contains("unique", StringComparison.OrdinalIgnoreCase)) adjusted++;
                 if (File.Exists(path) && request.Settings.CollisionPolicy == CollisionPolicy.Skip)
                     issues.Add(ValidationIssue.Info("output.skip", $"{Path.GetFileName(path)} already exists and will be skipped."));

@@ -15,8 +15,15 @@ it.**
 
 ## Network access
 
-Network access occurs only when the user explicitly requests it:
+Network access occurs only in the following cases:
 
+- **Optional update check.** In Settings > About you can enable a GitHub release
+  check. It is off by default; when enabled, the app requests release metadata
+  from GitHub and renders release notes locally. It never installs anything
+  automatically. See [docs/UPDATES.md](docs/UPDATES.md).
+- **Runtime upgrade after an app update.** If a newer PixelForge version needs a
+  newer llama.cpp runtime, the app downloads and verifies the pinned runtime in
+  the background on first launch after the update.
 - **Optional AI models and runtimes.** The shared AI Models panel downloads model
   weights and runtime packages from their upstream hosts, currently Hugging
   Face and GitHub. The request goes directly to the host and may expose the
@@ -54,10 +61,11 @@ Optional downloads are hosted by third parties with their own privacy policies:
 
 ## Code signing
 
-Release signing is provided by SignPath.io and SignPath Foundation. SignPath
-receives the build artifact and GitHub workflow metadata required to verify its
-origin. It does not receive user media or application data. See
-[CODE_SIGNING.md](CODE_SIGNING.md).
+Release signing is provided by SignPath.io and SignPath Foundation for future
+signed releases. SignPath receives the build artifact and GitHub workflow
+metadata required to verify its origin. It does not receive user media or
+application data. The v2.0.0 assets are unsigned and no build artifact was
+submitted to SignPath. See [CODE_SIGNING.md](CODE_SIGNING.md).
 
 ## Security reports
 

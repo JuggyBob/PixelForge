@@ -36,12 +36,18 @@ public sealed record ProcessingResult
     public MediaInfo? OutputInfo { get; init; }
     public string? Error { get; init; }
     public string? ErrorDetails { get; init; }
+    public string? ErrorCategory { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
     public TimeSpan Duration { get; init; }
     public long? OutputBytes { get; init; }
     public VerificationResult? Verification { get; init; }
     public IReadOnlyList<string> AdditionalOutputPaths { get; init; } = [];
     public string? EngineLog { get; init; }
+    public string? RequestedProvider { get; init; }
+    public string? ActualProvider { get; init; }
+    public string? FallbackReason { get; init; }
+    public string? RuntimeVersion { get; init; }
+    public string? ModelId { get; init; }
     public bool IsDirectoryOutput { get; init; }
 
     public static ProcessingResult Ok(string outputPath, MediaInfo? info, long outputBytes, TimeSpan duration,

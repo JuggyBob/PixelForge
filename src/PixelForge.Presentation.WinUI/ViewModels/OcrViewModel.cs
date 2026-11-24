@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -9,6 +10,7 @@ using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -28,9 +30,13 @@ public enum OcrSortMode
     FullPathAscending
 }
 
-public sealed record OcrSortChoice(OcrSortMode Value, string Label)
+public sealed record OcrSortChoice(OcrSortMode Value, string Label) : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
 }
 
 public sealed partial class OcrPageItem : ObservableObject
@@ -156,6 +162,8 @@ public sealed partial class OcrModelItem : ObservableObject
         OnPropertyChanged(nameof(NeedsDownload));
     }
 
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
+
     public void Begin(string text)
     {
         IsDownloading = true;
@@ -170,7 +178,9 @@ public sealed partial class OcrModelItem : ObservableObject
     public void Report(OcrModelDownloadProgress value)
     {
         Progress = value.Fraction * 100;
-        ProgressText = $"{value.Stage} · {value.BytesReceived / 1024d / 1024:0.0} / {value.TotalBytes / 1024d / 1024:0.0} MB";
+        ProgressText = LocalizationService.F("{0} · {1} / {2} MB", LocalizationService.T(value.Stage),
+            LocalizationService.FormatNumber(value.BytesReceived / 1024d / 1024, "0.0"),
+            LocalizationService.FormatNumber(value.TotalBytes / 1024d / 1024, "0.0"));
         NotifyState();
     }
 
@@ -213,6 +223,7 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
     private readonly IFilePickerService _filePicker;
     private readonly IJobService _jobs;
     private readonly IOcrModelManager _ocrModels;
+    private readonly IOcrReviewService _ocrReview;
     private readonly ISettingsService _settings;
     private readonly IAppPaths _paths;
     private readonly INavigationService _navigation;
@@ -225,14 +236,25 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _validationCts;
     private CancellationTokenSource? _modelCts;
     private bool _initialized;
+    private ValidationResult? _lastValidation;
+    private bool _hasScanResult;
+    private int _scanAdded;
+    private int _scanIncluded;
+    private int _scanIneligible;
+    private int _scanSkippedCount;
     private bool _documentNameEdited;
     private bool _updatingDocumentName;
+    private string? _reviewedMarkdownPath;
+    private string? _reviewedProvider;
+    private string? _reviewedRuntimeVersion;
+    private string? _reviewedSignature;
+    private readonly Dictionary<Guid, string> _reviewFiles = [];
     private bool _disposed;
 
     public OcrViewModel(ICapabilityRegistry registry, IMediaInspector inspector, IFolderScanner scanner,
         IThumbnailService thumbnails, IFilePickerService filePicker, IJobService jobs, IOcrModelManager ocrModels,
-        ISettingsService settings, IAppPaths paths, INavigationService navigation, IModelPanelService modelPanel,
-        IDialogService dialogs, INotificationService notifications, IAppLogger logger)
+        IOcrReviewService ocrReview, ISettingsService settings, IAppPaths paths, INavigationService navigation,
+        IModelPanelService modelPanel, IDialogService dialogs, INotificationService notifications, IAppLogger logger)
     {
         _registry = registry;
         _inspector = inspector;
@@ -241,6 +263,7 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         _filePicker = filePicker;
         _jobs = jobs;
         _ocrModels = ocrModels;
+        _ocrReview = ocrReview;
         _settings = settings;
         _paths = paths;
         _navigation = navigation;
@@ -254,6 +277,7 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
             : settings.Settings.Ocr.DefaultOutputDirectory;
         GeneratePdf = settings.Settings.Ocr.GeneratePdf;
         Preprocess = settings.Settings.Ocr.Preprocess;
+        ReviewBeforeExport = settings.Settings.Ocr.ReviewBeforeExport;
         SelectedCollision = CollisionOptions[0];
         SelectedSort = SortOptions[0];
         _jobs.JobChanged += OnJobChanged;
@@ -282,12 +306,27 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         new(CollisionPolicy.Overwrite, "Replace existing files", "Overwrite only after confirmation.")
     ];
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in SortOptions) option.RefreshLocalization();
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var model in Models) model.RefreshLocalization();
+        UpdateModelStatus();
+        UpdateProviderStatus();
+        if (_lastValidation is not null) SetValidation(_lastValidation);
+        if (_hasScanResult && !IsScanning)
+            ScanSummary = Loc.F("{0} added · {1} supported · {2} other files ignored · {3} skipped",
+                Loc.P("Count.Page", _scanAdded), _scanIncluded, _scanIneligible, _scanSkippedCount);
+    }
+
     [ObservableProperty] private OcrModelItem? _selectedModel;
     [ObservableProperty] private OcrSortChoice? _selectedSort;
     [ObservableProperty] private CollisionOption? _selectedCollision;
     [ObservableProperty] private bool _scanRecursive = true;
     [ObservableProperty] private bool _generatePdf;
     [ObservableProperty] private bool _preprocess = true;
+    [ObservableProperty] private bool _reviewBeforeExport;
     [ObservableProperty] private string _documentName = "ScannedDocument_OCR";
     [ObservableProperty] private string _outputDirectory = "";
     [ObservableProperty] private string _scanSummary = "";
@@ -300,7 +339,7 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _statusText = "Add scanned pages, photos or screenshots to begin.";
     [ObservableProperty] private string _modelStatus = "";
     public string ModelBadge => SelectedModel is null
-        ? "OCR · local inference"
+        ? Loc.T("OCR · local inference")
         : $"{SelectedModel.Name} · local inference";
     [ObservableProperty] private string _providerStatus = "OCR runtime not initialized.";
     [ObservableProperty] private string _validationSummary = "";
@@ -310,15 +349,15 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _lastDocxPath;
     [ObservableProperty] private bool _hasOutput;
 
-    public string PageCountText => Pages.Count == 1 ? "1 page" : $"{Pages.Count} pages";
+    public string PageCountText => LocalizationService.P("Count.Page", Pages.Count);
     public string FooterStatus => !HasPages
-        ? "Add scanned pages, photos or screenshots to begin."
+        ? Loc.T("Add scanned pages, photos or screenshots to begin.")
         : string.IsNullOrWhiteSpace(JobStatus)
-            ? $"{PageCountText} ready to assemble into one document."
+            ? Loc.F("{0} ready to assemble into one document.", PageCountText)
             : JobStatus;
     public string ModelLanguageText => SelectedModel?.Descriptor.Backend == OcrBackendKind.LlamaCpp
-        ? $"Advanced OCR model. Documented languages: {SelectedModel.Languages}. Page-level recognition is used; no translation is performed."
-        : "The PP-OCRv6 recognizer uses a multilingual dictionary. English and Italian are validated; no translation is performed.";
+        ? LocalizationService.F("Advanced OCR model. Documented languages: {0}. Page-level recognition is used; no translation is performed.", SelectedModel.Languages)
+        : LocalizationService.T("The PP-OCRv6 recognizer uses a multilingual dictionary. English and Italian are validated; no translation is performed.");
     public bool HasSkipped => Skipped.Count > 0;
 
     public async Task InitializeAsync()
@@ -388,7 +427,8 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
                 SetDocumentName(SanitizeDocumentName(first) + "_OCR");
             }
             if (added > 0 && !string.IsNullOrWhiteSpace(ScanSummary))
-                ScanSummary = $"{added} added · {Pages.Count} pages total";
+                ScanSummary = LocalizationService.F("{0} added · {1} pages total",
+                    LocalizationService.P("Count.Page", added), Pages.Count);
             RenumberPages();
             RefreshPageState();
             ScheduleValidation();
@@ -408,12 +448,13 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
     {
         IsScanning = true;
         IsBusy = true;
-        ScanSummary = "Scanning folder…";
+        _hasScanResult = false;
+        ScanSummary = Loc.T("Scanning folder…");
         HasScanSummary = true;
         try
         {
             var progress = new Progress<int>(count => _dispatcher.TryEnqueue(() =>
-                ScanSummary = $"Scanning folder. {count} files checked…"));
+                ScanSummary = LocalizationService.P("Scan.CheckedFiles", count)));
             var result = await _scanner.ScanAsync(new FolderScanRequest
             {
                 FolderPath = folder,
@@ -438,8 +479,14 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
                 added++;
             }
 
-            ScanSummary = $"{added} page{(added == 1 ? "" : "s")} added · {result.IncludedCount} supported · " +
-                          $"{result.IneligibleCount} other files ignored · {Skipped.Count} skipped";
+            ScanSummary = LocalizationService.F("{0} added · {1} supported · {2} other files ignored · {3} skipped",
+                LocalizationService.P("Count.Page", added), result.IncludedCount,
+                result.IneligibleCount, Skipped.Count);
+            _hasScanResult = true;
+            _scanAdded = added;
+            _scanIncluded = result.IncludedCount;
+            _scanIneligible = result.IneligibleCount;
+            _scanSkippedCount = Skipped.Count;
             if (!_documentNameEdited && Pages.Count > 0)
                 SetDocumentName(SanitizeDocumentName(Path.GetFileNameWithoutExtension(Pages[0].FileName)) + "_OCR");
             RenumberPages();
@@ -549,6 +596,7 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         Pages.Clear();
         Skipped.Clear();
         HasScanSummary = false;
+        _hasScanResult = false;
         ScanSummary = "";
         _documentNameEdited = false;
         SetDocumentName("ScannedDocument_OCR");
@@ -659,6 +707,11 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
             await _dialogs.ShowMessageAsync("OCR model required", "Download and select an OCR model first.");
             return;
         }
+        if (ReviewBeforeExport && !HasCurrentReview)
+        {
+            var reviewed = await RunReviewAsync();
+            if (!reviewed) return;
+        }
 
         var request = BuildRequest();
         var validation = await _jobs.ValidateAsync(request);
@@ -680,11 +733,18 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         {
             var job = await _jobs.EnqueueAsync(request);
             _trackedJobs.Add(job.Id);
-            JobStatus = $"Queued · {job.Title}";
+            if (!string.IsNullOrWhiteSpace(_reviewedMarkdownPath))
+                _reviewFiles[job.Id] = _reviewedMarkdownPath;
+            JobStatus = LocalizationService.F("Queued · {0}", job.Title);
             _notifications.Notify("OCR added to queue", job.Title, NotificationSeverity.Success);
             Pages.Clear();
+            _reviewedMarkdownPath = null;
+            _reviewedProvider = null;
+            _reviewedRuntimeVersion = null;
+            _reviewedSignature = null;
             Skipped.Clear();
             HasScanSummary = false;
+            _hasScanResult = false;
             ScanSummary = "";
             OnPropertyChanged(nameof(HasSkipped));
             RefreshPageState();
@@ -703,6 +763,69 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         }
     }
 
+    private bool HasCurrentReview =>
+        !string.IsNullOrWhiteSpace(_reviewedMarkdownPath) &&
+        File.Exists(_reviewedMarkdownPath) &&
+        string.Equals(_reviewedSignature, CurrentReviewSignature, StringComparison.Ordinal);
+
+    private string CurrentReviewSignature => string.Join("|",
+        Pages.Select(p => p.FilePath).Append(SelectedModel?.Id ?? "").Append(Preprocess ? "preprocess" : "raw"));
+
+    private async Task<bool> RunReviewAsync()
+    {
+        IsBusy = true;
+        StatusText = "Recognizing pages for review…";
+        try
+        {
+            var settings = new OcrSettings
+            {
+                OcrModelId = SelectedModel?.Id ?? "ppocrv6-small",
+                Preprocess = Preprocess,
+                ExecutionProvider = _settings.Settings.Ocr.ExecutionProvider,
+                PagePaths = Pages.Select(p => p.FilePath).ToList()
+            };
+            var progress = new Progress<ProcessingProgress>(value =>
+                _dispatcher.TryEnqueue(() => StatusText = value.Message ?? "Recognizing pages for review…"));
+            var result = await _ocrReview.RecognizeAsync(settings, progress);
+            if (!result.Success)
+            {
+                await _dialogs.ShowErrorAsync("OCR review could not run",
+                    result.Error ?? "The selected model could not recognize these pages.", result.ErrorDetails);
+                return false;
+            }
+
+            var guidance = "Edit the recognized text before PixelForge builds the DOCX. " +
+                           "Tables are preserved as Markdown. Cancel to return without queueing.";
+            if (result.Warnings.Count > 0)
+                guidance += "\n\n" + string.Join("\n", result.Warnings);
+            var reviewed = await _dialogs.ReviewTextAsync("Review OCR text", guidance, result.Markdown,
+                "Use reviewed text");
+            if (reviewed is null) return false;
+
+            var reviewDir = Path.Combine(_paths.TempDirectory, "ocr-review");
+            Directory.CreateDirectory(reviewDir);
+            var path = Path.Combine(reviewDir, $"review-{Guid.NewGuid():N}.md");
+            await File.WriteAllTextAsync(path, reviewed, new UTF8Encoding(false));
+            _reviewedMarkdownPath = path;
+            _reviewedProvider = result.Provider;
+            _reviewedRuntimeVersion = result.RuntimeVersion;
+            _reviewedSignature = CurrentReviewSignature;
+            StatusText = "Reviewed OCR text is ready to queue.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "OCR review failed");
+            await _dialogs.ShowErrorAsync("OCR review failed", ex.Message, ex.ToString());
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+            UpdateCanQueue();
+        }
+    }
+
     private JobRequest BuildRequest()
     {
         var inputs = Pages.Select(p => new JobInput { Path = p.FilePath, Info = p.Info }).ToList();
@@ -715,12 +838,16 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
             OutputDirectory = OutputDirectory,
             CollisionPolicy = SelectedCollision?.Policy ?? CollisionPolicy.UniqueName,
             ExecutionProvider = _settings.Settings.Ocr.ExecutionProvider,
-            PagePaths = inputs.Select(i => i.Path).ToList()
+            PagePaths = inputs.Select(i => i.Path).ToList(),
+            ReviewBeforeExport = ReviewBeforeExport,
+            ReviewedMarkdownPath = ReviewBeforeExport && HasCurrentReview ? _reviewedMarkdownPath : null,
+            ReviewedProvider = ReviewBeforeExport && HasCurrentReview ? _reviewedProvider : null,
+            ReviewedRuntimeVersion = ReviewBeforeExport && HasCurrentReview ? _reviewedRuntimeVersion : null
         };
         return new JobRequest
         {
             Operation = OperationKind.OcrDocument,
-            Title = $"OCR · {settings.DocumentName}",
+            Title = LocalizationService.F("OCR · {0}", settings.DocumentName),
             Settings = settings,
             Inputs = inputs
         };
@@ -754,23 +881,23 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         if (SelectedModel?.Descriptor.Backend == OcrBackendKind.LlamaCpp)
         {
             ProviderStatus = _settings.Settings.Ocr.ExecutionProvider == ExecutionProviderKind.Cpu
-                ? "Advanced OCR · llama.cpp CPU"
-                : "Advanced OCR · llama.cpp Vulkan preferred · CPU fallback";
+                ? Loc.T("Advanced OCR · llama.cpp CPU")
+                : Loc.T("Advanced OCR · llama.cpp Vulkan preferred · CPU fallback");
             return;
         }
 
         var directMl = _registry.ExecutionProviders.FirstOrDefault(p => p.Kind == ExecutionProviderKind.DirectML);
         ProviderStatus = _settings.Settings.Ocr.ExecutionProvider switch
         {
-            ExecutionProviderKind.Cpu => "CPU only · no GPU session will be requested",
-            ExecutionProviderKind.Vulkan => "Vulkan requested · PP-OCRv6 falls back to CPU; advanced OCR uses llama.cpp Vulkan",
+            ExecutionProviderKind.Cpu => Loc.T("CPU only · no GPU session will be requested"),
+            ExecutionProviderKind.Vulkan => Loc.T("Vulkan requested · PP-OCRv6 falls back to CPU; advanced OCR uses llama.cpp Vulkan"),
             ExecutionProviderKind.DirectML when directMl?.IsAvailable == true =>
-                "DirectML requested · CPU fallback is reported if the session cannot initialize",
+                Loc.T("DirectML requested · CPU fallback is reported if the session cannot initialize"),
             ExecutionProviderKind.DirectML =>
-                "DirectML requested · DirectML is unavailable, so CPU fallback will be reported",
+                Loc.T("DirectML requested · DirectML is unavailable, so CPU fallback will be reported"),
             _ when directMl?.IsAvailable == true =>
-                "Automatic · DirectML preferred for both detector and recognizer · CPU fallback",
-            _ => "Automatic · CPU fallback"
+                Loc.T("Automatic · DirectML preferred for both detector and recognizer · CPU fallback"),
+            _ => Loc.T("Automatic · CPU fallback")
         };
     }
 
@@ -782,8 +909,8 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
             return;
         }
         ModelStatus = SelectedModel.IsInstalled
-            ? $"{SelectedModel.Name} · installed · {SelectedModel.SizeText}"
-            : $"{SelectedModel.Name} · {SelectedModel.SizeText} · download required";
+            ? LocalizationService.F("{0} · installed · {1}", SelectedModel.Name, SelectedModel.SizeText)
+            : LocalizationService.F("{0} · {1} · download required", SelectedModel.Name, SelectedModel.SizeText);
         ScheduleValidation();
     }
 
@@ -859,13 +986,15 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
 
     private void SetValidation(ValidationResult? validation)
     {
+        _lastValidation = validation;
         HasValidationErrors = validation?.Errors.Count > 0;
         HasValidationWarnings = validation?.Warnings.Count > 0;
         ValidationSummary = validation is null
             ? ""
             : validation.IsValid
-                ? $"Ready · {Pages.Count} page{(Pages.Count == 1 ? "" : "s")}"
-                : string.Join("\n", validation.Errors.Select(e => e.Message));
+                ? LocalizationService.F("Ready · {0}",
+                    LocalizationService.P("Count.Page", Pages.Count))
+                : string.Join("\n", validation.Errors.Select(e => LocalizationService.T(e.Message)));
         UpdateCanQueue();
     }
 
@@ -983,13 +1112,17 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
 
     private void OnJobChanged(object? sender, JobChangedEventArgs e)
     {
-        if (!_trackedJobs.Contains(e.Job.Id)) return;
         if (!_dispatcher.HasThreadAccess)
         {
             _dispatcher.TryEnqueue(() => OnJobChanged(sender, e));
             return;
         }
-        JobStatus = $"{e.Job.StateText} · {e.Job.Title}";
+        if (!_trackedJobs.Contains(e.Job.Id)) return;
+        JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T(e.Job.StateText), e.Job.Title);
+        if (e.Job.IsTerminal && _reviewFiles.Remove(e.Job.Id, out var reviewPath))
+        {
+            try { if (File.Exists(reviewPath)) File.Delete(reviewPath); } catch { }
+        }
         if (e.Job.State == JobState.Completed)
         {
             var output = e.Job.Items.FirstOrDefault(i => i.State == JobItemState.Completed)?.OutputPath;
@@ -997,12 +1130,12 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
             {
                 LastDocxPath = output;
                 HasOutput = File.Exists(output);
-                JobStatus = "Completed · " + Path.GetFileName(output);
+                JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T("Completed"), Path.GetFileName(output));
             }
         }
         else if (e.Job.State == JobState.Failed)
         {
-            JobStatus = "Failed · " + e.Job.Error;
+            JobStatus = LocalizationService.F("{0} · {1}", LocalizationService.T("Failed"), e.Job.Error);
         }
     }
 
@@ -1044,6 +1177,11 @@ public sealed partial class OcrViewModel : ObservableObject, IDisposable
         _validationCts?.Dispose();
         _modelCts?.Cancel();
         _modelCts?.Dispose();
+        foreach (var path in _reviewFiles.Values)
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch { }
+        }
+        _reviewFiles.Clear();
     }
 }
 
@@ -1066,9 +1204,13 @@ internal sealed class NaturalStringComparer : IComparer<string>
                 var startY = j;
                 while (i < x.Length && char.IsDigit(x[i])) i++;
                 while (j < y.Length && char.IsDigit(y[j])) j++;
-                var nx = long.Parse(x[startX..i]);
-                var ny = long.Parse(y[startY..j]);
-                if (nx != ny) return nx.CompareTo(ny);
+                var nx = x[startX..i].TrimStart('0');
+                var ny = y[startY..j].TrimStart('0');
+                if (nx.Length == 0) nx = "0";
+                if (ny.Length == 0) ny = "0";
+                if (nx.Length != ny.Length) return nx.Length.CompareTo(ny.Length);
+                var digitCompare = string.CompareOrdinal(nx, ny);
+                if (digitCompare != 0) return digitCompare;
                 continue;
             }
 

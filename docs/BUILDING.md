@@ -9,7 +9,8 @@
 | Windows SDK | 10.0.26100 | WinUI/Windows App SDK build targets |
 | Visual Studio Build Tools | 2022/2026 with C++ workload | Required for native Windows App SDK dependencies |
 | PowerShell | 7.x | Build and dependency scripts |
-| Inno Setup | 7.x | Optional; required only for the installer |
+| Inno Setup | 7.x | Optional; required only for the Inno Setup EXE |
+| WiX | 5.0.2 | Required only for the MSI |
 
 ## Restore dependencies
 
@@ -56,23 +57,31 @@ UI tests require a desktop session, external engines, and the optional model fix
 
 ## Release packages
 
+The v2.0.0 assets are built locally and published **unsigned**. Verify the
+SHA-256 checksums in `SHA256SUMS.txt` before running an installer; Windows
+SmartScreen may show a warning. See [CODE_SIGNING.md](../CODE_SIGNING.md).
+
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.0.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 2.0.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 2.0.0
 ```
 
 This produces:
 
 ```text
-artifacts\installer\PixelForge-1.0.0-Setup.exe
-artifacts\portable\PixelForge-1.0.0-portable.zip
+artifacts\installer\PixelForge-2.0.0-Setup.exe
+artifacts\installer-msi\PixelForge-2.0.0-Setup.msi
+artifacts\portable\PixelForge-2.0.0-portable.zip
 artifacts\SHA256SUMS.txt
 ```
 
-The installer is per user and does not require administrator rights. Verify it without touching an existing installation:
+The EXE and MSI install per user and do not require administrator rights. The
+MSI refuses to install while the Inno Setup product is installed. Verify the
+EXE without touching an existing installation:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-installer.ps1 `
-  -Installer artifacts\installer\PixelForge-1.0.0-Setup.exe
+  -Installer artifacts\installer\PixelForge-2.0.0-Setup.exe
 ```
 
 ### Staged builds for signing
@@ -82,30 +91,30 @@ The signed-release workflow builds and signs in two stages so the installer cont
 Publish only:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.0.0 -Stage publish
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 2.0.0 -Stage publish
 ```
 
 After `PixelForge.exe` has been signed, package the signed application:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-release.ps1 `
-  -Version 1.0.0 -Stage package -SignedAppPath <path-to-signed-PixelForge.exe>
+  -Version 2.0.0 -Stage package -SignedAppPath <path-to-signed-PixelForge.exe>
 ```
 
-The package stage verifies that the supplied executable has a valid Authenticode signature from SignPath Foundation before it creates the portable ZIP or installer. The default `-Stage all` still performs an unsigned local build.
+The package stage verifies that the supplied executable has a valid Authenticode signature from SignPath Foundation before it creates the portable ZIP or installer. The v2.0.0 assets were built locally and published unsigned; the SignPath staged-build workflow below is not used for this release.
 
 ### Verify signatures
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify-signatures.ps1 `
-  -Path artifacts\release\v1.0.0\PixelForge-Setup-1.0.0-x64.exe
+  -Path artifacts\release\v2.0.0\PixelForge-Setup-2.0.0-x64.exe
 ```
 
 The script requires a valid signature, a signer containing `SignPath Foundation`, and a timestamp countersignature.
 
 ### Signed release workflow
 
-[`.github/workflows/release-sign.yml`](../.github/workflows/release-sign.yml) runs on a `v*` tag or manual dispatch. It requires the SignPath secret and variables described in [SIGNPATH.md](SIGNPATH.md), waits for manual approval in SignPath, verifies the signed application and installer, generates checksums after signing, and creates a draft GitHub release. Do not replace the existing unsigned `v1.0.0` assets; use a new version.
+[`.github/workflows/release-sign.yml`](../.github/workflows/release-sign.yml) runs on a `v*` tag or manual dispatch. It requires the SignPath secret and variables described in [SIGNPATH.md](SIGNPATH.md), waits for manual approval in SignPath, verifies the signed application and installer, generates checksums after signing, and creates a draft GitHub release. Neither v1.0.0 nor v2.0.0 was signed; a future version will be the first signed release. Do not replace the existing release assets; use a new version.
 
 ## Repository layout
 
@@ -113,7 +122,7 @@ The script requires a valid signature, a signer containing `SignPath Foundation`
 src/                       Application, domain, infrastructure, engines
 tests/                     Unit, integration, and UI test projects
 tools/                     Harness and UI automation utilities
-packaging/                 Inno Setup definition
+packaging/                 Inno Setup and WiX MSI definitions
 scripts/                   Build, dependency, and verification scripts
 testdata/fixtures/         Synthetic media fixtures for tests
 docs/                      Public documentation and screenshots

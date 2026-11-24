@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "command": [
+    "dotnet",
+    "run",
+    "--project",
+    "A:\\Projects\\Active\\PixelForge\\tools\\FormatScanProbe\\FormatScanProbe.csproj",
+    "-c",
+    "Release",
+    "--no-build"
+  ],
+  "lang": "csharp",
+  "runtime": "dotnet",
+  "base": ".",
+  "wall": 6.1339754,
+  "hotspots": [
+    {
+      "id": "PixelForge.FormatScanProbe.Program.Main",
+      "file": "A:/Projects/Active/PixelForge/tools/FormatScanProbe/Program.cs",
+      "line": 25,
+      "end_line": 51,
+      "name": "Main",
+      "qualname": "Main",
+      "module": "PixelForge.FormatScanProbe.Program",
+      "kind": "function",
+      "ncalls": 0,
+      "tottime": 0.16160942213114754,
+      "cumtime": 6.098062195081967,
+      "share": 0.9941451990632318,
+      "portability": 0.0,
+      "score": 0.0,
+      "blockers": [
+        "the entry point",
+        "does I/O: Console.WriteLine",
+        "not deterministic: Stopwatch.StartNew"
+      ],
+      "warnings": [],
+      "params": [],
+      "returns": "int",
+      "source": "    public static int Main()\n    {\n        var stopwatch = Stopwatch.StartNew();\n        long checksum = 0;\n        while (stopwatch.Elapsed < TimeSpan.FromSeconds(6))\n        {\n            foreach (var category in Categories)\n            {\n                var inputExtensions = FormatCatalog.GetInputExtensions(category);\n                checksum += inputExtensions.Count;\n\n                var contentExtensions = ContentFormatCatalog.GetInputExtensions(category);\n                checksum += contentExtensions.Count;\n\n                foreach (var extension in Extensions)\n                {\n                    checksum += (int)FormatCatalog.DetectCategoryByExtension(extension);\n                    checksum += (int)ContentFormatCatalog.DetectCategoryByExtension(extension);\n                    checksum += FormatCatalog.FindByExtension(extension) is null ? 0 : 1;\n                    checksum += ContentFormatCatalog.FindByExtension(extension) is null ? 0 : 1;\n                }\n            }\n        }\n\n        Console.WriteLine($\"checksum={checksum} elapsed={stopwatch.Elapsed.TotalSeconds:0.00}s\");\n        return 0;\n    }",
+      "calls": [],
+      "covered_by": null,
+      "owner": "Program"
+    }
+  ],
+  "ports": {},
+  "bench": null
+}

@@ -5,18 +5,22 @@ using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Domain;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class ConverterPage : Page
+public sealed partial class ConverterPage : Page, ILocalizationAwarePage
 {
     public ConverterViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public ConverterPage()
     {
         ViewModel = App.Services.GetRequiredService<ConverterViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -65,7 +69,7 @@ public sealed partial class ConverterPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Import into the converter";
+            e.DragUIOverride.Caption = LocalizationService.T("Import into the converter");
             e.DragUIOverride.IsContentVisible = true;
         }
     }

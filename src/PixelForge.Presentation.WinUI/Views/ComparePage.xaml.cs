@@ -6,21 +6,60 @@ using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
 using PixelForge.Presentation.Converters;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using PixelForge.Presentation.ViewModels;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class ComparePage : Page
+public sealed partial class ComparePage : Page, ILocalizationAwarePage
 {
     private readonly IMediaInspector _inspector;
     private readonly INavigationService _navigation;
+    private ComparisonRequest? _current;
+    private MediaInfo? _input;
+    private MediaInfo? _output;
 
     public ComparePage()
     {
         _inspector = App.Services.GetRequiredService<IMediaInspector>();
         _navigation = App.Services.GetRequiredService<INavigationService>();
         InitializeComponent();
+        LocalizationPageRegistry.Register(this);
+    }
+
+    public void RefreshLocalization()
+    {
+        if (_current is null)
+        {
+            TitleText.Text = Loc.T("Before / after");
+            SubtitleText.Text = Loc.T("Choose an upscaling result from the queue or history to compare it here.");
+            return;
+        }
+
+        TitleText.Text = Loc.T(_current.Title);
+        SubtitleText.Text = Loc.T("Drag the divider to inspect fine detail. Zoom and pan stay synchronized on both sides.");
+        UpdateMetadata();
+    }
+
+    private void UpdateMetadata()
+    {
+        if (_input is not { } input || _output is not { } output) return;
+        OriginalNameText.Text = input.FileName;
+        OriginalMetaText.Text = Loc.F("{0} × {1} · {2} · {3}",
+            input.Width, input.Height, input.FormatName ?? input.Extension,
+            FileSizeConverter.FormatBytes(input.FileSizeBytes));
+        OutputNameText.Text = output.FileName;
+        OutputMetaText.Text = Loc.F("{0} × {1} · {2} · {3}",
+            output.Width, output.Height, output.FormatName ?? output.Extension,
+            FileSizeConverter.FormatBytes(output.FileSizeBytes));
+        var scaleX = output.Width!.Value / (double)input.Width!.Value;
+        var scaleY = output.Height!.Value / (double)input.Height!.Value;
+        var scale = Math.Abs(scaleX - scaleY) < 0.01
+            ? LocalizationService.FormatNumber(scaleX, "0.##") + "×"
+            : LocalizationService.FormatNumber(scaleX, "0.##") + "× / " +
+              LocalizationService.FormatNumber(scaleY, "0.##") + "×";
+        ScaleText.Text = Loc.F("{0} · original aligned to output", scale);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -28,10 +67,12 @@ public sealed partial class ComparePage : Page
         base.OnNavigatedTo(e);
         if (e.Parameter is not ComparisonRequest request)
         {
-            TitleText.Text = "Before / after";
-            SubtitleText.Text = "Choose an upscaling result from the queue or history to compare it here.";
+            TitleText.Text = Loc.T("Before / after");
+            SubtitleText.Text = Loc.T("Choose an upscaling result from the queue or history to compare it here.");
             return;
         }
+
+        _current = request;
 
         try
         {
@@ -45,15 +86,11 @@ public sealed partial class ComparePage : Page
                 return;
             }
 
-            TitleText.Text = request.Title;
-            SubtitleText.Text = "Drag the divider to inspect fine detail. Zoom and pan stay synchronized on both sides.";
-            OriginalNameText.Text = input.FileName;
-            OriginalMetaText.Text = $"{input.Width} × {input.Height} · {input.FormatName ?? input.Extension} · {FileSizeConverter.FormatBytes(input.FileSizeBytes)}";
-            OutputNameText.Text = output.FileName;
-            OutputMetaText.Text = $"{output.Width} × {output.Height} · {output.FormatName ?? output.Extension} · {FileSizeConverter.FormatBytes(output.FileSizeBytes)}";
-            var scaleX = output.Width.Value / (double)input.Width.Value;
-            var scaleY = output.Height.Value / (double)input.Height.Value;
-            ScaleText.Text = $"{(Math.Abs(scaleX - scaleY) < 0.01 ? $"{scaleX:0.##}×" : $"{scaleX:0.##}× / {scaleY:0.##}×")} · original aligned to output";
+            TitleText.Text = Loc.T(request.Title);
+            SubtitleText.Text = Loc.T("Drag the divider to inspect fine detail. Zoom and pan stay synchronized on both sides.");
+            _input = input;
+            _output = output;
+            UpdateMetadata();
             Comparator.SetImages(request.InputPath, request.OutputPath, output.Width.Value, output.Height.Value);
         }
         catch (Exception ex)

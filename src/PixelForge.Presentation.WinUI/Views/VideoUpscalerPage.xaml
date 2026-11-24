@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Views.VideoUpscalerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     xmlns:controls="using:PixelForge.Presentation.Controls"
     NavigationCacheMode="Required"
     AllowDrop="True"
@@ -23,15 +24,15 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
-                <TextBlock Text="Video Upscaler" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="VideoUpscalerTitle" />
-                <TextBlock Text="Increase resolution with AI, raise the frame rate with RIFE interpolation, or do both in one local job."
+                <TextBlock loc:Loc.Text="Video Upscaler" Style="{StaticResource PageTitleTextStyle}" AutomationProperties.AutomationId="VideoUpscalerTitle" />
+                <TextBlock loc:Loc.Text="Increase resolution with AI, raise the frame rate with RIFE interpolation, or do both in one local job."
                            Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Border Style="{StaticResource StatusPillStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="7">
                         <Ellipse Width="7" Height="7" Fill="{ThemeResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="AI video · local processing" FontSize="11"
+                        <TextBlock loc:Loc.Text="AI video · local processing" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -59,18 +60,18 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Input videos" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock loc:Loc.Text="Input videos" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
                             <Border Grid.Column="1" Style="{StaticResource FormatBadgeStyle}">
-                                <TextBlock Text="{Binding Files.Count}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Files.Count, Converter={StaticResource Localize}}" FontSize="11" VerticalAlignment="Center" />
                             </Border>
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Content="Scan folder" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button loc:Loc.Content="Scan folder" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding BrowseFolderCommand}" AutomationProperties.AutomationId="VideoUpscalerAddFolder" />
-                            <Button Content="Add videos" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button loc:Loc.Content="Add videos" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding BrowseVideosCommand}" AutomationProperties.AutomationId="VideoUpscalerAddVideos" />
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ClearFilesCommand}"
-                                    ToolTipService.ToolTip="Clear workspace" AutomationProperties.Name="Clear video workspace"
+                                    loc:Loc.ToolTip="Clear workspace" loc:Loc.AutomationName="Clear video workspace"
                                     AutomationProperties.AutomationId="VideoUpscalerClear">
                                 <FontIcon Glyph="&#xE74D;" FontSize="14" />
                             </Button>
@@ -83,16 +84,16 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <CheckBox Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
+                            <CheckBox loc:Loc.Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeSubfolders, Mode=TwoWay}"
-                                      AutomationProperties.Name="Include subfolders" />
+                                      loc:Loc.AutomationName="Include subfolders" />
                             <ProgressRing Grid.Column="1" IsActive="{Binding IsScanning}" Width="16" Height="16"
                                           HorizontalAlignment="Right" VerticalAlignment="Center"
                                           Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
                         </Grid>
-                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" Title="Folder scan"
+                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" loc:Loc.Title="Folder scan"
                                  Message="{Binding ScanSummary}" IsClosable="False" />
-                        <Expander Header="Files ignored by this scan" IsExpanded="False"
+                        <Expander loc:Loc.Header="Files ignored by this scan" IsExpanded="False"
                                   Visibility="{Binding HasScanSkipped, Converter={StaticResource BoolToVisibility}}"
                                   HorizontalAlignment="Stretch">
                             <ItemsControl ItemsSource="{Binding Skipped}" MaxHeight="140">
@@ -105,8 +106,8 @@
                                             </Grid.ColumnDefinitions>
                                             <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource WarningBrush}" />
                                             <StackPanel Grid.Column="1" Spacing="0">
-                                                <TextBlock Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Reason}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding FileName, Converter={StaticResource Localize}}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Reason, Converter={StaticResource Localize}}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </Grid>
                                     </DataTemplate>
@@ -123,14 +124,14 @@
                                 <Border Background="{ThemeResource AccentSubtleBrush}" Width="62" Height="62" CornerRadius="16" HorizontalAlignment="Center">
                                     <FontIcon Glyph="&#xE714;" FontSize="28" Foreground="{ThemeResource AccentTextBrush}" />
                                 </Border>
-                                <TextBlock Text="Drop videos here" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                <TextBlock Text="Add one or more videos, or scan a folder. Every processed video keeps its original audio."
+                                <TextBlock loc:Loc.Text="Drop videos here" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                <TextBlock loc:Loc.Text="Add one or more videos, or scan a folder. Every processed video keeps its original audio."
                                            Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                                    <Button Content="Choose videos" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding BrowseVideosCommand}" />
-                                    <Button Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding BrowseFolderCommand}" />
+                                    <Button loc:Loc.Content="Choose videos" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding BrowseVideosCommand}" />
+                                    <Button loc:Loc.Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding BrowseFolderCommand}" />
                                 </StackPanel>
-                                <TextBlock Text="Super-resolution runs frame by frame; frame interpolation uses RIFE between neighbouring frames."
+                                <TextBlock loc:Loc.Text="Super-resolution runs frame by frame; frame interpolation uses RIFE between neighbouring frames."
                                            Style="{StaticResource CaptionTextStyle}" TextAlignment="Center" />
                             </StackPanel>
                         </Border>
@@ -162,14 +163,14 @@
                                             </Grid>
                                         </Border>
                                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding DisplayPath}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding DisplayPath, Converter={StaticResource Localize}}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Detail, Converter={StaticResource Localize}}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
                                         <Border Grid.Column="2" Style="{StaticResource FormatBadgeStyle}">
-                                            <TextBlock Text="{Binding Dimensions}" FontSize="10" />
+                                            <TextBlock Text="{Binding Dimensions, Converter={StaticResource Localize}}" FontSize="10" />
                                         </Border>
                                         <Button Grid.Column="3" Style="{StaticResource IconButtonStyle}" Command="{Binding RemoveCommand}"
-                                                ToolTipService.ToolTip="Remove from list" AutomationProperties.Name="Remove from list">
+                                                loc:Loc.ToolTip="Remove from list" loc:Loc.AutomationName="Remove from list">
                                             <FontIcon Glyph="&#xE711;" FontSize="12" />
                                         </Button>
                                     </Grid>
@@ -189,9 +190,9 @@
                                 <Image Source="{Binding PreviewImage}" Stretch="UniformToFill" />
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
-                                <TextBlock Text="Preview" Style="{StaticResource CardTitleTextStyle}" />
-                                <TextBlock Text="{Binding PreviewStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <Button Content="Open source video" Style="{StaticResource SubtleButtonStyle}"
+                                <TextBlock loc:Loc.Text="Preview" Style="{StaticResource CardTitleTextStyle}" />
+                                <TextBlock Text="{Binding PreviewStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <Button loc:Loc.Content="Open source video" Style="{StaticResource SubtleButtonStyle}"
                                         Command="{Binding OpenInputCommand}" />
                             </StackPanel>
                         </Grid>
@@ -207,17 +208,17 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <StackPanel Padding="18,16,18,10" Spacing="2">
-                        <TextBlock Text="Video enhancement" Style="{StaticResource SectionTitleTextStyle}" />
-                        <TextBlock Text="AI Super-resolution and frame interpolation are separate stages."
+                        <TextBlock loc:Loc.Text="Video enhancement" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock loc:Loc.Text="AI Super-resolution and frame interpolation are separate stages."
                                    Style="{StaticResource CaptionTextStyle}" />
                     </StackPanel>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,4,18,18">
                         <StackPanel Spacing="15">
                             <StackPanel Spacing="8">
-                                <ToggleSwitch Header="AI super-resolution" IsOn="{Binding EnableSuperResolution, Mode=TwoWay}"
+                                <ToggleSwitch loc:Loc.Header="AI super-resolution" IsOn="{Binding EnableSuperResolution, Mode=TwoWay}"
                                               AutomationProperties.AutomationId="VideoUpscalerEnableSr" />
                                 <StackPanel Spacing="4" Visibility="{Binding ShowImageSettings, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Upscaling model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Upscaling model" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -226,26 +227,43 @@
                                         <ComboBox ItemsSource="{Binding ImageModels}" SelectedItem="{Binding SelectedImageModel, Mode=TwoWay}"
                                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch"
                                                   AutomationProperties.AutomationId="VideoUpscalerImageModel" />
-                                        <Button Grid.Column="1" Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="1" loc:Loc.Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ManageModelsCommand}" AutomationProperties.AutomationId="VideoUpscalerManageModels" />
                                     </Grid>
-                                    <TextBlock Text="{Binding ImageModelStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding ImageModelStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="Output scale" Style="{StaticResource CaptionTextStyle}" />
+                                        <TextBlock loc:Loc.Text="Output scale" Style="{StaticResource CaptionTextStyle}" />
                                         <ComboBox ItemsSource="{Binding ScaleOptions}" SelectedItem="{Binding SelectedScale, Mode=TwoWay}"
-                                                  DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                                                  DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch" />
                                     </StackPanel>
-                                    <TextBlock Text="Only the model's native scale is offered so the output is a genuine AI upscale." Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock loc:Loc.Text="Only the model's native scale is offered so the output is a genuine AI upscale." Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Spacing="4" Visibility="{Binding ShowTemporalSettings, Converter={StaticResource BoolToVisibility}}">
+                                    <ToggleSwitch loc:Loc.Header="Temporal stability (reduce flicker)"
+                                                  IsOn="{Binding EnableTemporalStability, Mode=TwoWay}"
+                                                  AutomationProperties.AutomationId="VideoUpscalerEnableTemporal" />
+                                    <StackPanel Spacing="4" Visibility="{Binding EnableTemporalStability, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid>
+                                            <TextBlock loc:Loc.Text="Temporal strength" Style="{StaticResource CaptionTextStyle}" />
+                                            <TextBlock Text="{Binding TemporalStabilityStrength, Converter={StaticResource Localize}}" HorizontalAlignment="Right"
+                                                       Style="{StaticResource CaptionTextStyle}" />
+                                        </Grid>
+                                        <Slider Minimum="0" Maximum="100" StepFrequency="1"
+                                                Value="{Binding TemporalStabilityStrength, Mode=TwoWay}"
+                                                AutomationProperties.AutomationId="VideoUpscalerTemporalStrength" />
+                                        <TextBlock loc:Loc.Text="Motion-adaptive: static areas are blended, moving edges keep the current frame. Scene cuts reset the blend."
+                                                   Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="8">
-                                <ToggleSwitch Header="AI frame interpolation" IsOn="{Binding EnableInterpolation, Mode=TwoWay}"
+                                <ToggleSwitch loc:Loc.Header="AI frame interpolation" IsOn="{Binding EnableInterpolation, Mode=TwoWay}"
                                               AutomationProperties.AutomationId="VideoUpscalerEnableFi" />
                                 <StackPanel Spacing="4" Visibility="{Binding ShowInterpolationSettings, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Interpolation model" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Interpolation model" Style="{StaticResource CaptionTextStyle}" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -254,43 +272,43 @@
                                         <ComboBox ItemsSource="{Binding InterpolationModels}" SelectedItem="{Binding SelectedInterpolationModel, Mode=TwoWay}"
                                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch"
                                                   AutomationProperties.AutomationId="VideoUpscalerInterpolationModel" />
-                                        <Button Grid.Column="1" Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
+                                        <Button Grid.Column="1" loc:Loc.Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
                                                 Command="{Binding ManageInterpolationModelsCommand}"
                                                 AutomationProperties.AutomationId="VideoUpscalerManageInterpolationModels" />
                                     </Grid>
-                                    <TextBlock Text="{Binding InterpolationModelStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                    <TextBlock Text="Frame-rate multiplier" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock Text="{Binding InterpolationModelStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock loc:Loc.Text="Frame-rate multiplier" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding FrameRateOptions}" SelectedItem="{Binding SelectedFrameRate, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
-                                    <TextBlock Text="The output keeps the source duration and audio timing. Scene cuts are detected and are not interpolated across." Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                              DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch" />
+                                    <TextBlock loc:Loc.Text="The output keeps the source duration and audio timing. Scene cuts are detected and are not interpolated across." Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Output preview" Style="{StaticResource CaptionTextStyle}" />
-                                <TextBlock Text="{Binding ExpectedOutput}" FontSize="13" FontWeight="SemiBold" />
-                                <TextBlock Text="MP4 · H.264 · original audio preserved where compatible" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Output preview" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock Text="{Binding ExpectedOutput, Converter={StaticResource Localize}}" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock loc:Loc.Text="MP4 · H.264 · original audio preserved where compatible" Style="{StaticResource CaptionTextStyle}" />
                             </StackPanel>
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Video bitrate (kbps)" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Video bitrate (kbps)" Style="{StaticResource CaptionTextStyle}" />
                                 <NumberBox Minimum="100" Maximum="200000" SmallChange="500" SpinButtonPlacementMode="Compact"
                                            Value="{Binding VideoBitrateKbps, Mode=TwoWay}" />
                             </StackPanel>
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Execution provider" Style="{StaticResource CaptionTextStyle}" />
                                 <ComboBox ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
                                           DisplayMemberPath="DisplayName" HorizontalAlignment="Stretch" />
-                                <TextBlock Text="{Binding ProviderStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ProviderStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Destination" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Destination" Style="{StaticResource CaptionTextStyle}" />
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -298,13 +316,13 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
-                                        <TextBlock Text="{Binding OutputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
-                                                   ToolTipService.ToolTip="{Binding OutputDirectory}" />
+                                        <TextBlock Text="{Binding OutputDirectory, Converter={StaticResource Localize}}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding OutputDirectory, Converter={StaticResource Localize}}" />
                                     </Border>
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseOutputCommand}" AutomationProperties.AutomationId="VideoUpscalerChooseOutput" />
                                     <Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Command="{Binding OpenOutputCommand}"
-                                            ToolTipService.ToolTip="Open destination" AutomationProperties.Name="Open destination">
+                                            loc:Loc.ToolTip="Open destination" loc:Loc.AutomationName="Open destination">
                                         <FontIcon Glyph="&#xE8B7;" FontSize="13" />
                                     </Button>
                                 </Grid>
@@ -316,22 +334,22 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="If a file exists" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="If a file exists" Style="{StaticResource CaptionTextStyle}" />
                                     <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedCollision, Mode=TwoWay}"
-                                              DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                                              DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="4">
-                                    <TextBlock Text="Filename suffix" Style="{StaticResource CaptionTextStyle}" />
+                                    <TextBlock loc:Loc.Text="Filename suffix" Style="{StaticResource CaptionTextStyle}" />
                                     <TextBox Text="{Binding FileNameSuffix, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             PlaceholderText="e.g. _upscaled" />
+                                             loc:Loc.Placeholder="e.g. _upscaled" />
                                 </StackPanel>
                             </Grid>
 
                             <StackPanel Spacing="8" Visibility="{Binding HasValidationErrors, Converter={StaticResource BoolToVisibility}}">
-                                <InfoBar IsOpen="True" Severity="Error" Title="Cannot start" Message="{Binding ValidationSummary}" />
+                                <InfoBar IsOpen="True" Severity="Error" loc:Loc.Title="Cannot start" Message="{Binding ValidationSummary}" />
                             </StackPanel>
                             <StackPanel Spacing="8" Visibility="{Binding HasValidationWarnings, Converter={StaticResource BoolToVisibility}}">
-                                <InfoBar IsOpen="True" Severity="Warning" Title="Review before processing" Message="{Binding ValidationSummary}" />
+                                <InfoBar IsOpen="True" Severity="Warning" loc:Loc.Title="Review before processing" Message="{Binding ValidationSummary}" />
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -346,13 +364,13 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Summary}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding JobStatus}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Summary, Converter={StaticResource Localize}}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding JobStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button Content="Compare last result" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CompareLastCommand}"
+                    <Button loc:Loc.Content="Compare last result" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CompareLastCommand}"
                             IsEnabled="{Binding CanCompare}" AutomationProperties.AutomationId="VideoUpscalerCompare" />
-                    <Button Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding AddToQueueCommand}"
+                    <Button loc:Loc.Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding AddToQueueCommand}"
                             IsEnabled="{Binding CanQueue}" AutomationProperties.AutomationId="VideoUpscalerAddToQueue" />
                 </StackPanel>
             </Grid>

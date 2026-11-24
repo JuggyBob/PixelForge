@@ -9,6 +9,7 @@ public sealed class WatchFolderRule
     public string InputDirectory { get; set; } = "";
     public string OutputDirectory { get; set; } = "";
     public bool IncludeSubdirectories { get; set; } = true;
+    public bool IgnorePreviouslyProcessed { get; set; } = true;
     public bool IsEnabled { get; set; } = true;
     public OperationKind Operation { get; set; } = OperationKind.ImageConvert;
     public OperationSettings Settings { get; set; } = new ImageConversionSettings();
@@ -23,6 +24,7 @@ public sealed class WatchFolderRule
         OperationKind.VideoConvert => "Video conversion",
         OperationKind.UpscaleTraditional => "Image upscaling",
         OperationKind.UpscaleAi => "AI image upscaling",
+        OperationKind.VideoUpscale => "Video upscaling",
         OperationKind.DocumentConvert => "Document conversion",
         OperationKind.EbookConvert => "E-book conversion",
         OperationKind.ArchiveConvert => "Archive conversion",
@@ -45,6 +47,7 @@ public sealed class WatchFolderRule
         InputDirectory = InputDirectory,
         OutputDirectory = OutputDirectory,
         IncludeSubdirectories = IncludeSubdirectories,
+        IgnorePreviouslyProcessed = IgnorePreviouslyProcessed,
         IsEnabled = IsEnabled,
         Operation = Operation,
         Settings = Settings.Clone(),

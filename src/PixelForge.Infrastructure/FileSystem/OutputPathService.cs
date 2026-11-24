@@ -14,7 +14,8 @@ public sealed class OutputPathService : IOutputPathService
     }
 
     public string BuildOutputPath(string inputPath, string outputDirectory, string extension, string suffix,
-        string? relativeDirectory, CollisionPolicy collisionPolicy, out string? adjustmentNote)
+        string? relativeDirectory, CollisionPolicy collisionPolicy, out string? adjustmentNote,
+        string? preferredBaseName = null)
     {
         if (string.IsNullOrWhiteSpace(outputDirectory))
             throw new ArgumentException("Choose an output directory.", nameof(outputDirectory));
@@ -29,7 +30,10 @@ public sealed class OutputPathService : IOutputPathService
         if (!IsPathInside(destinationDirectory, fullOutputDirectory))
             throw new InvalidOperationException("The output path would escape the selected destination folder.");
 
-        var baseName = _fileNames.SanitizeFileName(Path.GetFileNameWithoutExtension(fullInput));
+        var baseName = _fileNames.SanitizeFileName(
+            string.IsNullOrWhiteSpace(preferredBaseName)
+                ? Path.GetFileNameWithoutExtension(fullInput)
+                : Path.GetFileNameWithoutExtension(preferredBaseName));
         var finalName = _fileNames.WithSuffix(baseName, suffix) + _fileNames.NormalizeExtension(extension);
         var desired = Path.Combine(destinationDirectory, finalName);
         adjustmentNote = null;

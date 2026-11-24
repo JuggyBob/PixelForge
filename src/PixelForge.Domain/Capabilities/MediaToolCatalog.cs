@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace PixelForge.Domain.Capabilities;
 
 /// <summary>
@@ -5,7 +7,16 @@ namespace PixelForge.Domain.Capabilities;
 /// truth used to filter the tool picker and to reject incompatible requests.
 /// </summary>
 public sealed record MediaToolDefinition(string Id, string Label, MediaCategory Category, string Description)
+    : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public void RefreshLocalization()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Label)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Description)));
+    }
+
     public override string ToString() => Label;
 }
 

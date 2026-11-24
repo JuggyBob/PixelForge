@@ -1,11 +1,14 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
@@ -18,9 +21,13 @@ public enum QueueFilter
     Failed
 }
 
-public sealed record QueueFilterOption(QueueFilter Value, string Label)
+public sealed record QueueFilterOption(QueueFilter Value, string Label) : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
 }
 
 public sealed partial class QueueViewModel : ObservableObject, IDisposable
@@ -28,6 +35,7 @@ public sealed partial class QueueViewModel : ObservableObject, IDisposable
     private readonly IJobService _jobs;
     private readonly INavigationService _navigation;
     private readonly IDialogService _dialogs;
+    private readonly IFilePickerService _filePicker;
     private readonly INotificationService _notifications;
     private readonly IAppLogger _logger;
     private readonly DispatcherQueue _dispatcher;
@@ -35,11 +43,12 @@ public sealed partial class QueueViewModel : ObservableObject, IDisposable
     private bool _disposed;
 
     public QueueViewModel(IJobService jobs, INavigationService navigation, IDialogService dialogs,
-        INotificationService notifications, IAppLogger logger)
+        IFilePickerService filePicker, INotificationService notifications, IAppLogger logger)
     {
         _jobs = jobs;
         _navigation = navigation;
         _dialogs = dialogs;
+        _filePicker = filePicker;
         _notifications = notifications;
         _logger = logger;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
@@ -55,6 +64,20 @@ public sealed partial class QueueViewModel : ObservableObject, IDisposable
         new(QueueFilter.Finished, "Finished"),
         new(QueueFilter.Failed, "Failed")
     ];
+
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in FilterOptions) option.RefreshLocalization();
+        foreach (var item in _allJobs)
+        {
+            var job = _jobs.Jobs.FirstOrDefault(j => j.Id == item.Id);
+            if (job is not null)
+                item.Update(job);
+            else
+                item.RefreshLocalization();
+        }
+    }
 
     [ObservableProperty] private ObservableCollection<JobItemViewModel> _visibleJobs = [];
     [ObservableProperty] private QueueFilterOption _selectedFilter;
@@ -216,6 +239,24 @@ public sealed partial class QueueViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void OpenHistory() => _navigation.Navigate("History");
 
+    public async Task SaveReportTextAsync(string reportText, string suggestedName)
+    {
+        var path = await _filePicker.PickTextSaveFileAsync(suggestedName);
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            await File.WriteAllTextAsync(path, reportText);
+            _notifications.Notify("Job report saved", Path.GetFileName(path), NotificationSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            await _dialogs.ShowErrorAsync("Could not save the report", ex.Message);
+        }
+    }
+
+    public Task ViewReportTextAsync(string title, string reportText) =>
+        _dialogs.ShowTextAsync(title, reportText);
+
     public void Compare(JobItemViewModel job, JobChildItemViewModel child)
     {
         if (child.InputPath is null || child.OutputPath is null) return;
@@ -342,6 +383,7 @@ public sealed partial class JobItemViewModel : ObservableObject
 
     public Guid Id { get; }
     public ObservableCollection<JobChildItemViewModel> Children { get; }
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _operationText = "";
     [ObservableProperty] private string _stateText = "";
@@ -362,10 +404,11 @@ public sealed partial class JobItemViewModel : ObservableObject
     [ObservableProperty] private string _iconGlyph = "\uE8AB";
     [ObservableProperty] private string _outputDirectory = "";
     [ObservableProperty] private bool _hasError;
+    [ObservableProperty] private string _reportText = "";
 
     public bool IsTerminal => IsCompleted || IsFailed || IsCancelled || IsInterrupted;
     public bool HasItems => Children.Count > 0;
-    public string ItemCountText => Children.Count == 1 ? "1 item" : $"{Children.Count} items";
+    public string ItemCountText => LocalizationService.P("Count.Item", Children.Count);
 
     public void Update(ProcessingJob job)
     {
@@ -373,8 +416,8 @@ public sealed partial class JobItemViewModel : ObservableObject
         OperationText = job.OperationText;
         StateText = job.StateText;
         Progress = job.Progress * 100;
-        ProgressText = job.ProgressText;
-        BatchSummary = job.BatchSummary ?? "";
+        ProgressText = LocalizationService.T(job.ProgressText);
+        BatchSummary = LocalizationService.LocalizeBatchSummary(job.BatchSummary);
         Error = job.Error ?? "";
         HasError = !string.IsNullOrWhiteSpace(Error) && job.IsTerminal;
         CreatedText = FormatRelative(job.CreatedAt);
@@ -413,10 +456,56 @@ public sealed partial class JobItemViewModel : ObservableObject
             }
         }
 
+        ReportText = BuildJobReport(job);
         OnPropertyChanged(nameof(IsTerminal));
         OnPropertyChanged(nameof(ItemCountText));
         OnPropertyChanged(nameof(HasItems));
     }
+
+    private string BuildJobReport(ProcessingJob job)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"PixelForge job report");
+        builder.AppendLine($"Job ID: {job.Id}");
+        builder.AppendLine($"Operation: {job.OperationText}");
+        builder.AppendLine($"Title: {job.Title}");
+        builder.AppendLine($"State: {job.StateText}");
+        builder.AppendLine($"Created: {job.CreatedAt:O}");
+        builder.AppendLine($"Started: {job.StartedAt:O}");
+        builder.AppendLine($"Completed: {job.CompletedAt:O}");
+        builder.AppendLine($"Output directory: {job.OutputDirectory}");
+        builder.AppendLine($"Progress: {job.ProgressText}");
+        if (!string.IsNullOrWhiteSpace(job.BatchSummary)) builder.AppendLine($"Batch summary: {job.BatchSummary}");
+        if (job.CompletedAt is { } completed && job.StartedAt is { } started)
+            builder.AppendLine($"Duration: {(completed - started).TotalSeconds:0.0}s");
+        if (!string.IsNullOrWhiteSpace(job.Error)) builder.AppendLine($"Error: {job.Error}");
+        if (!string.IsNullOrWhiteSpace(job.ErrorDetails)) builder.AppendLine($"Error details: {job.ErrorDetails}");
+        builder.AppendLine();
+        foreach (var child in Children)
+            builder.AppendLine(child.ReportText);
+        return builder.ToString().TrimEnd();
+    }
+
+    [RelayCommand]
+    private void CopyReport()
+    {
+        try
+        {
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(ReportText);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        }
+        catch
+        {
+            // Clipboard failures must not break the queue.
+        }
+    }
+
+    [RelayCommand]
+    private void SaveReport() => _ = _owner.SaveReportTextAsync(ReportText, $"pixelforge-job-{Id:N}.txt");
+
+    [RelayCommand]
+    private void ViewReport() => _ = _owner.ViewReportTextAsync($"Job report · {Title}", ReportText);
 
     [RelayCommand]
     private void ToggleDetails() => IsExpanded = !IsExpanded;
@@ -439,10 +528,10 @@ public sealed partial class JobItemViewModel : ObservableObject
     private static string FormatRelative(DateTimeOffset time)
     {
         var delta = DateTimeOffset.Now - time;
-        if (delta.TotalSeconds < 60) return "just now";
-        if (delta.TotalMinutes < 60) return $"{(int)delta.TotalMinutes}m ago";
-        if (delta.TotalHours < 24) return $"{(int)delta.TotalHours}h ago";
-        return time.LocalDateTime.ToString("MMM d, HH:mm");
+        if (delta.TotalSeconds < 60) return LocalizationService.T("just now");
+        if (delta.TotalMinutes < 60) return LocalizationService.P("Relative.MinutesAgo", Math.Max(1, (int)delta.TotalMinutes));
+        if (delta.TotalHours < 24) return LocalizationService.P("Relative.HoursAgo", Math.Max(1, (int)delta.TotalHours));
+        return LocalizationService.FormatDateTime(time, "g");
     }
 }
 
@@ -463,6 +552,7 @@ public sealed partial class JobChildItemViewModel : ObservableObject
 
     private JobItemState _state;
     public Guid Id { get; }
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
     public Guid ParentJobId => _parent.Id;
     public string FileName { get; }
     public string InputPath { get; }
@@ -476,6 +566,7 @@ public sealed partial class JobChildItemViewModel : ObservableObject
     [ObservableProperty] private bool _canOpenOutput;
     [ObservableProperty] private bool _canCompare;
     [ObservableProperty] private string _detail = "";
+    [ObservableProperty] private string _reportText = "";
 
     public void Update(JobItem item)
     {
@@ -498,12 +589,61 @@ public sealed partial class JobChildItemViewModel : ObservableObject
             JobItemState.Cancelled => item.Message ?? "Cancelled",
             _ => item.Message ?? item.StateText
         };
+        ReportText = BuildReport(item);
         OnPropertyChanged(nameof(CanCancel));
         OnPropertyChanged(nameof(CanRemove));
     }
 
+    private static string BuildReport(JobItem item)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Item: {item.FileName}");
+        builder.AppendLine($"Input: {item.InputPath}");
+        builder.AppendLine($"Output: {item.OutputPath}");
+        builder.AppendLine($"State: {item.StateText}");
+        builder.AppendLine($"Attempt: {item.Attempt}");
+        builder.AppendLine($"Started: {item.StartedAt:O}");
+        builder.AppendLine($"Completed: {item.CompletedAt:O}");
+        builder.AppendLine($"Input bytes: {item.InputBytes:N0}");
+        builder.AppendLine($"Output bytes: {item.OutputBytes?.ToString("N0") ?? "n/a"}");
+        builder.AppendLine($"Duration: {item.Duration?.TotalSeconds:0.0}s");
+        if (!string.IsNullOrWhiteSpace(item.Error)) builder.AppendLine($"Error: {item.Error}");
+        if (!string.IsNullOrWhiteSpace(item.ErrorCategory)) builder.AppendLine($"Category: {item.ErrorCategory}");
+        if (!string.IsNullOrWhiteSpace(item.ErrorDetails)) builder.AppendLine($"Details: {item.ErrorDetails}");
+        if (!string.IsNullOrWhiteSpace(item.EngineLog)) builder.AppendLine($"Engine log: {item.EngineLog}");
+        if (!string.IsNullOrWhiteSpace(item.VerificationSummary)) builder.AppendLine($"Verification: {item.VerificationSummary}");
+        if (!string.IsNullOrWhiteSpace(item.RequestedProvider)) builder.AppendLine($"Requested provider: {item.RequestedProvider}");
+        if (!string.IsNullOrWhiteSpace(item.ActualProvider)) builder.AppendLine($"Actual provider: {item.ActualProvider}");
+        if (!string.IsNullOrWhiteSpace(item.FallbackReason)) builder.AppendLine($"Fallback: {item.FallbackReason}");
+        if (!string.IsNullOrWhiteSpace(item.RuntimeVersion)) builder.AppendLine($"Runtime: {item.RuntimeVersion}");
+        if (!string.IsNullOrWhiteSpace(item.ModelId)) builder.AppendLine($"Model: {item.ModelId}");
+        if (item.Warnings.Count > 0) builder.AppendLine($"Warnings: {string.Join(" | ", item.Warnings)}");
+        return builder.ToString().TrimEnd();
+    }
+
     public bool CanCancel => _state is JobItemState.Pending or JobItemState.Running;
     public bool CanRemove => _state == JobItemState.Pending || (_parent.IsTerminal && _state is not (JobItemState.Pending or JobItemState.Running));
+
+    [RelayCommand]
+    private void CopyReport()
+    {
+        try
+        {
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(ReportText);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        }
+        catch
+        {
+            // Clipboard failures must not break the queue.
+        }
+    }
+
+    [RelayCommand]
+    private void SaveReport() => _ = _owner.SaveReportTextAsync(ReportText, $"pixelforge-item-{Id:N}.txt");
+
+    [RelayCommand]
+    private void ViewReport() => _ = _owner.ViewReportTextAsync($"Item report · {FileName}", ReportText);
 
     [RelayCommand]
     private void OpenOutput() => _owner.OpenChildOutput(this);

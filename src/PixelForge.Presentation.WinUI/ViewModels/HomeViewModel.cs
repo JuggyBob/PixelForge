@@ -7,6 +7,7 @@ using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
 using PixelForge.Presentation.Converters;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
@@ -35,6 +36,14 @@ public sealed partial class HomeViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _statusText = "Starting local engines…";
     [ObservableProperty] private string _statusDetail = "No account or cloud service required";
     [ObservableProperty] private bool _isBusy;
+
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var item in Recent) item.RefreshLocalization();
+        foreach (var item in ActiveJobs) item.RefreshLocalization();
+        LoadEngines();
+    }
 
     public HomeViewModel(IHistoryRepository history, IJobService jobs, ICapabilityRegistry registry,
         IMediaInspector inspector, INavigationService navigation, IFilePickerService filePicker,
@@ -356,6 +365,8 @@ public sealed partial class ActiveJobViewModel : ObservableObject
         };
     }
 
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
+
     [RelayCommand]
     private void OpenQueue() => _navigation.Navigate("Queue");
 }
@@ -410,14 +421,16 @@ public sealed partial class RecentItemViewModel : ObservableObject
     public bool CanCompare => _entry.Operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional
                               && _entry.InputPath is not null && _entry.OutputPath is not null;
 
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
+
     private static string FormatRelative(DateTimeOffset time)
     {
         var delta = DateTimeOffset.Now - time;
-        if (delta.TotalSeconds < 60) return "just now";
-        if (delta.TotalMinutes < 60) return $"{(int)delta.TotalMinutes}m ago";
-        if (delta.TotalHours < 24) return $"{(int)delta.TotalHours}h ago";
-        if (delta.TotalDays < 7) return $"{(int)delta.TotalDays}d ago";
-        return time.LocalDateTime.ToString("MMM d");
+        if (delta.TotalSeconds < 60) return LocalizationService.T("just now");
+        if (delta.TotalMinutes < 60) return LocalizationService.P("Relative.MinutesAgo", Math.Max(1, (int)delta.TotalMinutes));
+        if (delta.TotalHours < 24) return LocalizationService.P("Relative.HoursAgo", Math.Max(1, (int)delta.TotalHours));
+        if (delta.TotalDays < 7) return LocalizationService.P("Relative.DaysAgo", Math.Max(1, (int)delta.TotalDays));
+        return LocalizationService.FormatDate(time, "d");
     }
 
     [RelayCommand]

@@ -51,6 +51,9 @@ public sealed class ExpansionUiTests
         AssertInsideWindow(window, "UpscalerManageModels");
         AssertInsideWindow(window, "UpscalerAddToQueue");
         app.Capture(window, "23-min-width-upscaler");
+
+        app.Navigate(window, "NavWatch", "WatchTitle");
+        app.Capture(window, "24-min-width-watch-folders");
     }
 
     [Fact]
@@ -450,7 +453,8 @@ internal static class UiModelSeed
                     if (!File.Exists(Path.Combine(downloads, file))) return false;
 
                 FindRun("runtimes", "ncnn", "installed-ncnn-runtimes.json");
-                FindRun("runtimes", "llama.cpp", "llama-cpp-b12110-vulkan", "llama-server.exe");
+                try { FindRun("runtimes", "llama.cpp", "llama-cpp-v1.0.0-vulkan", "llama-server.exe"); }
+                catch (DirectoryNotFoundException) { FindRun("runtimes", "llama.cpp", "llama-cpp-b12110-vulkan", "llama-server.exe"); }
                 FindRun("models", "ocr", "xiaomi-ocr-0", "Xiaomi-OCR-0-Q4_K_M.gguf");
                 return true;
             }
@@ -479,8 +483,17 @@ internal static class UiModelSeed
 
         CopyDirectory(FindRun("runtimes", "ncnn", "installed-ncnn-runtimes.json"),
             Path.Combine(dataDirectory, "runtimes", "ncnn"));
-        CopyDirectory(FindRun("runtimes", "llama.cpp", "llama-cpp-b12110-vulkan", "llama-server.exe"),
-            Path.Combine(dataDirectory, "runtimes", "llama.cpp", "llama-cpp-b12110-vulkan"));
+        string llamaRuntime;
+        try
+        {
+            llamaRuntime = FindRun("runtimes", "llama.cpp", "llama-cpp-v1.0.0-vulkan", "llama-server.exe");
+        }
+        catch (DirectoryNotFoundException)
+        {
+            llamaRuntime = FindRun("runtimes", "llama.cpp", "llama-cpp-b12110-vulkan", "llama-server.exe");
+        }
+        CopyDirectory(llamaRuntime,
+            Path.Combine(dataDirectory, "runtimes", "llama.cpp", "llama-cpp-v1.0.0-vulkan"));
         CopyDirectory(FindRun("models", "ocr", "xiaomi-ocr-0", "Xiaomi-OCR-0-Q4_K_M.gguf"),
             Path.Combine(models, "ocr", "xiaomi-ocr-0"));
 

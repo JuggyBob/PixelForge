@@ -56,11 +56,14 @@ public sealed class AppPaths : IAppPaths
         try
         {
             if (!Directory.Exists(TempDirectory)) return;
+            if ((File.GetAttributes(TempDirectory) & FileAttributes.ReparsePoint) != 0) return;
             var cutoff = DateTime.UtcNow.AddDays(-2);
+            var root = Path.GetFullPath(TempDirectory).TrimEnd(Path.DirectorySeparatorChar);
             foreach (var dir in Directory.EnumerateDirectories(TempDirectory))
             {
                 try
                 {
+                    if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
                     if (Directory.GetLastWriteTimeUtc(dir) < cutoff)
                     {
                         Directory.Delete(dir, recursive: true);
@@ -69,6 +72,27 @@ public sealed class AppPaths : IAppPaths
                 catch
                 {
                     // A leftover directory may still be locked; try again next time.
+                }
+            }
+
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System,
+                IgnoreInaccessible = true
+            };
+            foreach (var file in Directory.EnumerateFiles(TempDirectory, "*", options))
+            {
+                try
+                {
+                    var full = Path.GetFullPath(file);
+                    if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (File.GetLastWriteTimeUtc(file) < cutoff) File.Delete(file);
+                }
+                catch
+                {
+                    // Leave locked review files for the next cleanup pass.
                 }
             }
         }

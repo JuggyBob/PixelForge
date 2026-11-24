@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Controls.ModelManagerView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     Background="Transparent">
 
     <Grid Padding="24,18,24,20" RowSpacing="10">
@@ -24,26 +25,26 @@
             </Grid.ColumnDefinitions>
             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding BackCommand}" VerticalAlignment="Center" Margin="0,0,2,0"
                     Visibility="{Binding IsPanelMode, Converter={StaticResource InverseBoolToVisibility}}"
-                    ToolTipService.ToolTip="Back" AutomationProperties.Name="Back">
+                    loc:Loc.ToolTip="Back" loc:Loc.AutomationName="Back">
                 <FontIcon Glyph="&#xE72B;" FontSize="14" />
             </Button>
-            <TextBlock Grid.Column="1" Text="AI Models" Style="{StaticResource PageTitleTextStyle}"
+            <TextBlock Grid.Column="1" loc:Loc.Text="AI Models" Style="{StaticResource PageTitleTextStyle}"
                        VerticalAlignment="Center" AutomationProperties.AutomationId="ModelsTitle" />
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RefreshModelsCommand}" ToolTipService.ToolTip="Refresh model list"
-                        AutomationProperties.Name="Refresh model list">
+                <Button Style="{StaticResource IconButtonStyle}" Command="{Binding RefreshModelsCommand}" loc:Loc.ToolTip="Refresh model list"
+                        loc:Loc.AutomationName="Refresh model list">
                     <FontIcon Glyph="&#xE72C;" FontSize="14" />
                 </Button>
                 <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ClosePanelCommand}"
                         Visibility="{Binding IsPanelMode, Converter={StaticResource BoolToVisibility}}"
-                        ToolTipService.ToolTip="Close model panel" AutomationProperties.Name="Close model panel"
+                        loc:Loc.ToolTip="Close model panel" loc:Loc.AutomationName="Close model panel"
                         AutomationProperties.AutomationId="ModelsClosePanel">
                     <FontIcon Glyph="&#xE711;" FontSize="14" />
                 </Button>
             </StackPanel>
         </Grid>
 
-        <TextBlock Grid.Row="1" Text="One verified model library for image upscaling, video frames, interpolation and OCR."
+        <TextBlock Grid.Row="1" loc:Loc.Text="One verified model library for image upscaling, video frames, interpolation and OCR."
                    Style="{StaticResource PageSubtitleTextStyle}" TextWrapping="Wrap" MaxLines="2"
                    TextTrimming="CharacterEllipsis" />
 
@@ -52,9 +53,9 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Button Content="Open folder" Style="{StaticResource SecondaryButtonStyle}"
+            <Button loc:Loc.Content="Open folder" Style="{StaticResource SecondaryButtonStyle}"
                     Command="{Binding OpenFolderCommand}" HorizontalAlignment="Stretch" />
-            <Button Grid.Column="1" Content="Change folder" Style="{StaticResource SecondaryButtonStyle}"
+            <Button Grid.Column="1" loc:Loc.Content="Change folder" Style="{StaticResource SecondaryButtonStyle}"
                     Command="{Binding ChooseFolderCommand}" HorizontalAlignment="Stretch" />
         </Grid>
 
@@ -63,11 +64,11 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Show" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center"
+            <TextBlock loc:Loc.Text="Show" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center"
                        TextWrapping="NoWrap" MinWidth="40" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding FilterOptions}" SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
-                      DisplayMemberPath="Label" HorizontalAlignment="Stretch"
-                      AutomationProperties.Name="Model category filter" AutomationProperties.AutomationId="ModelCategoryFilter" />
+                      DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch"
+                      loc:Loc.AutomationName="Model category filter" AutomationProperties.AutomationId="ModelCategoryFilter" />
         </Grid>
 
         <Border Grid.Row="4" Style="{StaticResource InsetCardStyle}" Padding="12,9">
@@ -78,14 +79,14 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <FontIcon Glyph="&#xE8B7;" FontSize="15" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding ModelDirectory}" FontFamily="{ThemeResource AppMonoFontFamily}"
+                <TextBlock Grid.Column="1" Text="{Binding ModelDirectory, Converter={StaticResource Localize}}" FontFamily="{ThemeResource AppMonoFontFamily}"
                            FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="2" Text="{Binding BusyStatus}" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding BusyStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" />
             </Grid>
         </Border>
 
-        <InfoBar Grid.Row="5" IsOpen="True" Severity="Informational" Title="Local AI, explicit downloads"
-                 Message="Weights are not bundled in the installer. Downloads are SHA-256 verified before installation; after that, inference never needs a network connection."
+        <InfoBar Grid.Row="5" IsOpen="True" Severity="Informational" loc:Loc.Title="Local AI, explicit downloads"
+                 loc:Loc.Message="Weights are not bundled in the installer. Downloads are SHA-256 verified before installation; after that, inference never needs a network connection."
                  IsClosable="False" />
 
         <ListView Grid.Row="6" ItemsSource="{Binding VisibleModels}" SelectionMode="None" Padding="0"
@@ -116,12 +117,18 @@
                                     <FontIcon Glyph="&#xE945;" FontSize="20" Foreground="{ThemeResource AccentTextBrush}" />
                                 </Border>
                                 <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name, Converter={StaticResource Localize}}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding CompatibilityGlyph, Converter={StaticResource Localize}}" FontSize="14" FontWeight="Bold"
+                                                   Foreground="{Binding CompatibilityBrush}"
+                                                   ToolTipService.ToolTip="{Binding CompatibilityTooltip, Converter={StaticResource Localize}}"
+                                                   AutomationProperties.Name="{Binding CompatibilityTooltip, Converter={StaticResource Localize}}" />
+                                    </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="{Binding Version}" FontSize="11" MaxLines="1" TextWrapping="NoWrap"
+                                        <TextBlock Text="{Binding Version, Converter={StaticResource Localize}}" FontSize="11" MaxLines="1" TextWrapping="NoWrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                        <TextBlock Text="{Binding Tags}" FontSize="11" MaxLines="1" TextWrapping="NoWrap"
+                                        <TextBlock Text="{Binding Tags, Converter={StaticResource Localize}}" FontSize="11" MaxLines="1" TextWrapping="NoWrap"
                                                    TextTrimming="CharacterEllipsis"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
@@ -132,10 +139,10 @@
                                                  Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibility}}" />
                                         <Ellipse Width="7" Height="7" Fill="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center"
                                                  Visibility="{Binding IsInstalled, Converter={StaticResource InverseBoolToVisibility}}" />
-                                        <TextBlock Text="{Binding StatusText}" FontSize="11" />
+                                        <TextBlock Text="{Binding StatusText, Converter={StaticResource Localize}}" FontSize="11" />
                                     </StackPanel>
                                 </Border>
-                                <TextBlock Grid.Column="3" Text="{Binding SizeText}" FontSize="11" VerticalAlignment="Center"
+                                <TextBlock Grid.Column="3" Text="{Binding SizeText, Converter={StaticResource Localize}}" FontSize="11" VerticalAlignment="Center"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" MinWidth="56" TextAlignment="Right" />
                             </Grid>
 
@@ -145,76 +152,80 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="2">
-                                    <TextBlock Text="{Binding Architecture}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding IntendedUse}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Architecture, Converter={StaticResource Localize}}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding IntendedUse, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
-                                <TextBlock Grid.Column="1" Text="{Binding ScaleText}" FontSize="24" FontWeight="SemiBold"
+                                <TextBlock Grid.Column="1" Text="{Binding ScaleText, Converter={StaticResource Localize}}" FontSize="24" FontWeight="SemiBold"
                                            Foreground="{ThemeResource AccentTextBrush}" VerticalAlignment="Center" />
                             </Grid>
 
                             <StackPanel Spacing="5" Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVisibility}}">
                                 <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="5" />
-                                <TextBlock Text="{Binding ProgressText}" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock Text="{Binding ProgressText, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" />
                             </StackPanel>
 
-                            <InfoBar IsOpen="{Binding HasError}" Severity="Error" Title="Model operation failed" Message="{Binding Error}"
+                            <InfoBar IsOpen="{Binding HasError}" Severity="Error" loc:Loc.Title="Model operation failed" Message="{Binding Error}"
                                      IsClosable="False" />
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Download" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding DownloadCommand}"
+                                <Button Content="{Binding DownloadLabel, Converter={StaticResource Localize}}" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding DownloadCommand}"
                                         Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="Cancel" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CancelCommand}"
-                                        Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="Install from file" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding InstallFromFileCommand}"
+                                <Button loc:Loc.Content="Pause" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding PauseCommand}"
+                                        Visibility="{Binding CanPause, Converter={StaticResource BoolToVisibility}}" />
+                                <Button loc:Loc.Content="Resume" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding ResumeCommand}"
+                                        Visibility="{Binding CanResume, Converter={StaticResource BoolToVisibility}}" />
+                                <Button loc:Loc.Content="Cancel" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CancelCommand}"
+                                        Visibility="{Binding CanCancelDownload, Converter={StaticResource BoolToVisibility}}" />
+                                <Button loc:Loc.Content="Install from file" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding InstallFromFileCommand}"
                                         Visibility="{Binding CanInstallFromFile, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="Validate" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ValidateCommand}"
+                                <Button loc:Loc.Content="Validate" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ValidateCommand}"
                                         Visibility="{Binding CanValidate, Converter={StaticResource BoolToVisibility}}" />
-                                <Button Content="Remove" Style="{StaticResource DangerButtonStyle}" Command="{Binding RemoveCommand}"
+                                <Button loc:Loc.Content="Remove" Style="{StaticResource DangerButtonStyle}" Command="{Binding RemoveCommand}"
                                         Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
 
-                            <Expander Header="Model details" HorizontalAlignment="Stretch">
+                            <Expander loc:Loc.Header="Model details" HorizontalAlignment="Stretch">
                                 <StackPanel Spacing="5" Padding="4,6">
-                                    <TextBlock Text="{Binding InstalledDetail}" Style="{StaticResource SecondaryTextStyle}" />
-                                    <TextBlock Text="{Binding Notes}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding InstalledDetail, Converter={StaticResource Localize}}" Style="{StaticResource SecondaryTextStyle}" />
+                                    <TextBlock Text="{Binding Notes, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Task" FontWeight="SemiBold" FontSize="11" />
-                                        <TextBlock Grid.Column="1" Text="{Binding TaskText}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                        <TextBlock loc:Loc.Text="Task" FontWeight="SemiBold" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding TaskText, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     </Grid>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Runtime" FontWeight="SemiBold" FontSize="11" />
-                                        <TextBlock Grid.Column="1" Text="{Binding RuntimeBackend}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                        <TextBlock loc:Loc.Text="Runtime" FontWeight="SemiBold" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding RuntimeBackend, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     </Grid>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Provider" FontWeight="SemiBold" FontSize="11" />
-                                        <TextBlock Grid.Column="1" Text="{Binding ProviderSupport}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                        <TextBlock loc:Loc.Text="Provider" FontWeight="SemiBold" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding ProviderSupport, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     </Grid>
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="Verified" FontWeight="SemiBold" FontSize="11" />
-                                        <TextBlock Grid.Column="1" Text="{Binding VerificationStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                        <TextBlock loc:Loc.Text="Verified" FontWeight="SemiBold" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding VerificationStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                     </Grid>
-                                    <TextBlock Text="Source" FontWeight="SemiBold" FontSize="11" />
-                                    <TextBlock Text="{Binding SourceUrl}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
-                                    <TextBlock Text="SHA-256" FontWeight="SemiBold" FontSize="11" />
-                                    <TextBlock Text="{Binding Hash}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding LicenseName}" FontWeight="SemiBold" FontSize="11" />
-                                    <TextBlock Text="{Binding LicenseDetail}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock loc:Loc.Text="Source" FontWeight="SemiBold" FontSize="11" />
+                                    <TextBlock Text="{Binding SourceUrl, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock loc:Loc.Text="SHA-256" FontWeight="SemiBold" FontSize="11" />
+                                    <TextBlock Text="{Binding Hash, Converter={StaticResource Localize}}" Style="{StaticResource MonoTextStyle}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding LicenseName, Converter={StaticResource Localize}}" FontWeight="SemiBold" FontSize="11" />
+                                    <TextBlock Text="{Binding LicenseDetail, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Expander>
                         </StackPanel>

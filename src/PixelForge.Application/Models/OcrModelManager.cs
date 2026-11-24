@@ -134,12 +134,12 @@ public sealed class OcrModelManager : IOcrModelManager
 
         await _gate.WaitAsync(cancellationToken);
         var tempFiles = new List<string>();
+        var preservePartial = false;
         try
         {
             Directory.CreateDirectory(ModelDirectory);
             var directory = Path.Combine(ModelDirectory, descriptor.Id);
             var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
-            if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
             Directory.CreateDirectory(staging);
 
             var total = descriptor.TotalSizeBytes;
@@ -188,8 +188,7 @@ public sealed class OcrModelManager : IOcrModelManager
             });
             ValidateOnnxFiles(staging, descriptor);
 
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
-            Directory.Move(staging, directory);
+            InstallDirectoryTransactional(staging, directory);
             tempFiles.Clear();
 
             var installed = new InstalledOcrModel
@@ -221,6 +220,7 @@ public sealed class OcrModelManager : IOcrModelManager
         }
         catch (OperationCanceledException)
         {
+            preservePartial = true;
             return new OcrModelDownloadResult { Success = false, Error = "The OCR model download was cancelled." };
         }
         catch (Exception ex)
@@ -235,17 +235,20 @@ public sealed class OcrModelManager : IOcrModelManager
         }
         finally
         {
-            foreach (var temp in tempFiles)
+            if (!preservePartial)
             {
-                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
-            }
+                foreach (var temp in tempFiles)
+                {
+                    try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+                }
 
-            try
-            {
-                var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
-                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+                try
+                {
+                    var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
+                    if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+                }
+                catch { }
             }
-            catch { }
             _gate.Release();
         }
     }
@@ -326,6 +329,32 @@ public sealed class OcrModelManager : IOcrModelManager
         }
     }
 
+    public Task DiscardPartialAsync(string modelId, CancellationToken cancellationToken = default)
+    {
+        var descriptor = OcrModelCatalog.Find(modelId);
+        if (descriptor is null) return Task.CompletedTask;
+        var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
+        try { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); } catch { }
+        return Task.CompletedTask;
+    }
+
+    public bool HasPartialDownload(string modelId)
+    {
+        var descriptor = OcrModelCatalog.Find(modelId);
+        if (descriptor is null) return false;
+        var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
+        if (!Directory.Exists(staging)) return false;
+        try
+        {
+            return Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories)
+                .Any(path => new FileInfo(path).Length > 0);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<InstalledOcrModel?> ResolveAsync(string modelId, CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);
@@ -346,9 +375,10 @@ public sealed class OcrModelManager : IOcrModelManager
 
         await _gate.WaitAsync(cancellationToken);
         var tempFiles = new List<string>();
+        var preservePartial = false;
         try
         {
-            var runtimeId = descriptor.RuntimeId ?? "llama-cpp-b12110-vulkan";
+            var runtimeId = descriptor.RuntimeId ?? LlamaCppRuntimeCatalog.Vulkan.Id;
             if (_llamaRuntime.GetInstalled(runtimeId) is null)
             {
                 progress?.Report(new OcrModelDownloadProgress
@@ -380,7 +410,6 @@ public sealed class OcrModelManager : IOcrModelManager
             Directory.CreateDirectory(ModelDirectory);
             var directory = Path.Combine(ModelDirectory, descriptor.Id);
             var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
-            if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
             Directory.CreateDirectory(staging);
 
             var total = descriptor.TotalSizeBytes;
@@ -413,8 +442,7 @@ public sealed class OcrModelManager : IOcrModelManager
                 BytesReceived = total,
                 TotalBytes = total
             });
-            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
-            Directory.Move(staging, directory);
+            InstallDirectoryTransactional(staging, directory);
             tempFiles.Clear();
 
             var installed = new InstalledOcrModel
@@ -436,6 +464,7 @@ public sealed class OcrModelManager : IOcrModelManager
         }
         catch (OperationCanceledException)
         {
+            preservePartial = true;
             return new OcrModelDownloadResult { Success = false, Error = "The OCR model download was cancelled." };
         }
         catch (Exception ex)
@@ -450,16 +479,19 @@ public sealed class OcrModelManager : IOcrModelManager
         }
         finally
         {
-            foreach (var temp in tempFiles)
+            if (!preservePartial)
             {
-                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+                foreach (var temp in tempFiles)
+                {
+                    try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+                }
+                try
+                {
+                    var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
+                    if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+                }
+                catch { }
             }
-            try
-            {
-                var staging = Path.Combine(ModelDirectory, $".{descriptor.Id}.download");
-                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
-            }
-            catch { }
             _gate.Release();
         }
     }
@@ -469,7 +501,7 @@ public sealed class OcrModelManager : IOcrModelManager
     {
         if (descriptor.MainModel is null || descriptor.MmprojModel is null)
             return null;
-        if (_llamaRuntime.GetInstalled(descriptor.RuntimeId ?? "llama-cpp-b12110-vulkan") is null)
+        if (_llamaRuntime.GetInstalled(descriptor.RuntimeId ?? LlamaCppRuntimeCatalog.Vulkan.Id) is null)
         {
             var missingRuntime = new InstalledOcrModel
             {
@@ -547,44 +579,49 @@ public sealed class OcrModelManager : IOcrModelManager
     private async Task<(bool Success, string? Error, string? Details)> DownloadFileAsync(OcrModelFile file,
         string destination, IProgress<long>? progress, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, file.DownloadUrl);
-        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            return (false, $"The OCR model server returned {(int)response.StatusCode} {response.ReasonPhrase}.", file.DownloadUrl);
-
-        var expected = response.Content.Headers.ContentLength ?? file.SizeBytes;
-        if (expected > 0 && expected != file.SizeBytes)
-            return (false, "The OCR model server returned an unexpected size.", file.DownloadUrl);
-
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var target = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-            128 * 1024, useAsync: true);
-        var buffer = new byte[128 * 1024];
-        long received = 0;
-        var lastReport = 0L;
-        while (true)
+        try
         {
-            var read = await source.ReadAsync(buffer, cancellationToken);
-            if (read <= 0) break;
-            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-            received += read;
-            var now = Environment.TickCount64;
-            if (now - lastReport > 120)
-            {
-                lastReport = now;
-                progress?.Report(received);
-            }
+            await ResumableDownloader.DownloadAsync(_httpClient, file.DownloadUrl, destination, file.SizeBytes,
+                (received, _) => progress?.Report(received), cancellationToken);
+            return (true, null, null);
         }
-
-        progress?.Report(received);
-        if (received != file.SizeBytes)
-            return (false, "The OCR model download was incomplete.",
-                $"Expected {file.SizeBytes:N0} bytes, received {received:N0}.");
-        return (true, null, null);
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message, file.DownloadUrl);
+        }
     }
 
-    private static async Task VerifyFileAsync(string path, OcrModelFile file, CancellationToken cancellationToken)
+    private static void InstallDirectoryTransactional(string staging, string destination)
     {
+        var backup = destination + ".backup";
+        if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        if (Directory.Exists(destination)) Directory.Move(destination, backup);
+        try
+        {
+            Directory.Move(staging, destination);
+            if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
+                if (Directory.Exists(backup)) Directory.Move(backup, destination);
+            }
+            catch
+            {
+                // Keep the original error; a leftover backup remains recoverable.
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task VerifyFileAsync(string path, OcrModelFile file, CancellationToken cancellationToken)    {
         var info = new FileInfo(path);
         if (!info.Exists) throw new FileNotFoundException("The OCR model file is missing.", path);
         if (info.Length != file.SizeBytes)
@@ -615,7 +652,8 @@ public sealed class OcrModelManager : IOcrModelManager
         var candidates = new List<string>
         {
             Path.Combine(AppContext.BaseDirectory, "ocr", fileName),
-            Path.Combine(AppContext.BaseDirectory, "Assets", "OCR", fileName)
+            Path.Combine(AppContext.BaseDirectory, "Assets", "OCR", fileName),
+            Path.Combine(AppContext.BaseDirectory, fileName)
         };
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         for (var i = 0; i < 10 && current is not null; i++, current = current.Parent)

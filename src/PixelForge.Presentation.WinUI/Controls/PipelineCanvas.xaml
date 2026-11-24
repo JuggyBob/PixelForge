@@ -1,0 +1,71 @@
+<UserControl
+    x:Class="PixelForge.Presentation.Controls.PipelineCanvas"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    AllowDrop="True">
+
+    <Grid x:Name="Viewport" Background="Transparent" AllowDrop="True">
+        <!-- The grid lives in its own transformed layer so a screen-space
+             edge fade can sit above it without dimming nodes or connections. -->
+        <Canvas x:Name="GridWorld" IsHitTestVisible="False">
+            <Canvas.RenderTransform>
+                <CompositeTransform x:Name="GridTransform" />
+            </Canvas.RenderTransform>
+            <Path x:Name="GridPath"
+                  Stroke="{ThemeResource PipelineGridStrokeBrush}"
+                  StrokeThickness="1"
+                  Opacity="0.55"
+                  IsHitTestVisible="False" />
+        </Canvas>
+
+        <Grid x:Name="GridFade" IsHitTestVisible="False">
+            <Rectangle Height="64" VerticalAlignment="Top"
+                       Fill="{ThemeResource PipelineGridFadeTopBrush}" />
+            <Rectangle Height="64" VerticalAlignment="Bottom"
+                       Fill="{ThemeResource PipelineGridFadeBottomBrush}" />
+            <Rectangle Width="64" HorizontalAlignment="Left"
+                       Fill="{ThemeResource PipelineGridFadeLeftBrush}" />
+            <Rectangle Width="64" HorizontalAlignment="Right"
+                       Fill="{ThemeResource PipelineGridFadeRightBrush}" />
+        </Grid>
+
+        <Canvas x:Name="World" RenderTransformOrigin="0,0" HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <Canvas.RenderTransform>
+                <CompositeTransform x:Name="WorldTransform" />
+            </Canvas.RenderTransform>
+            <Canvas x:Name="ConnectionLayer" />
+            <Canvas x:Name="NodeLayer" />
+            <Rectangle x:Name="ActionDropIndicator"
+                       Width="280" Height="64"
+                       RadiusX="10" RadiusY="10"
+                       Fill="{ThemeResource AccentSubtleBrush}"
+                       Stroke="{ThemeResource AccentPrimaryBrush}"
+                       StrokeThickness="1.5"
+                       StrokeDashArray="4,3"
+                       Visibility="Collapsed"
+                       IsHitTestVisible="False" />
+            <Path x:Name="ConnectionPreview"
+                  Stroke="{ThemeResource AccentPrimaryBrush}"
+                  StrokeThickness="2.5"
+                  StrokeDashArray="4,3"
+                  Visibility="Collapsed"
+                  IsHitTestVisible="False" />
+        </Canvas>
+
+        <Border x:Name="ZoomBadge"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,16,16"
+                Padding="8,4"
+                CornerRadius="8"
+                Background="{ThemeResource SubtleSurfaceBrush}"
+                BorderBrush="{ThemeResource DividerBrush}"
+                BorderThickness="1"
+                IsHitTestVisible="False">
+            <TextBlock x:Name="ZoomText" FontSize="11" AutomationProperties.AutomationId="PipelineZoomText" />
+        </Border>
+    </Grid>
+</UserControl>

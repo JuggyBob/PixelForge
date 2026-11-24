@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Name>PixelForge-$(Version)-Setup</Name>
+    <DebugType>full</DebugType>
+    <SuppressIces>ICE38;ICE64;ICE91;ICE03</SuppressIces>
+    <DefineConstants>Version=$(Version);IconPath=$(IconPath)</DefineConstants>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <BindPath Include="$(PublishDir)" BindName="Publish" />
+  </ItemGroup>
+</Project>

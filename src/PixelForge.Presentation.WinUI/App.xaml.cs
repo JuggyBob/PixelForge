@@ -2,8 +2,11 @@ using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using PixelForge.Application.Models;
 using PixelForge.Composition;
 using PixelForge.Domain.Interfaces;
+using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using PixelForge.Presentation.ViewModels;
 using PixelForge.Presentation.Views;
@@ -29,10 +32,24 @@ public partial class App : Microsoft.UI.Xaml.Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _singleInstanceMutex = new Mutex(true, "PixelForge.Desktop.SingleInstance", out var createdNew);
+        var commandArgs = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        string userScope;
+        try
+        {
+            userScope = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
+                        ?? Environment.UserName;
+        }
+        catch
+        {
+            userScope = Environment.UserName;
+        }
+
+        _singleInstanceMutex = new Mutex(true,
+            @"Local\PixelForge.Desktop.SingleInstance." + userScope.Replace('\\', '_'), out var createdNew);
         _ownsMutex = createdNew;
         if (!createdNew)
         {
+            await ShellActivationService.SendToRunningInstanceAsync(commandArgs);
             Exit();
             return;
         }
@@ -47,6 +64,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             services.AddSingleton<IDialogService, DialogService>();
             services.AddSingleton<IFilePickerService, FilePickerService>();
             services.AddSingleton<INotificationService, NotificationService>();
+            services.AddSingleton<IDownloadActivityService, DownloadActivityService>();
             services.AddSingleton<IModelPanelService, ModelPanelService>();
             services.AddSingleton<IWaveformService, WaveformService>();
             services.AddSingleton<JobNotificationCoordinator>();
@@ -55,6 +73,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             services.AddTransient<HomeViewModel>();
             services.AddSingleton<ConverterStagingSession>();
             services.AddTransient<ConverterViewModel>();
+            services.AddTransient<PipelinesViewModel>();
             services.AddTransient<MediaToolsViewModel>();
             services.AddTransient<WatchFoldersViewModel>();
             services.AddTransient<UpscalerViewModel>();
@@ -68,22 +87,57 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             var settings = Services.GetRequiredService<ISettingsService>();
             await settings.LoadAsync();
-            Services.GetRequiredService<IAppLogger>().LogInformation(
+            var logger = Services.GetRequiredService<IAppLogger>();
+            logger.LogInformation(
                 $"Startup: settings ready at {StartupClock.Elapsed.TotalMilliseconds:0.0} ms");
+
+            // Resolve the language before constructing any window. A stored value
+            // is validated; an empty value means this is the first launch.
+            var storedLanguage = settings.Settings.General.Language;
+            var language = string.IsNullOrWhiteSpace(storedLanguage)
+                ? LocalizationService.DetectSystemLanguage()
+                : LocalizationService.NormalizeLocale(storedLanguage);
+            LocalizationService.Initialize(language);
+            if (!string.Equals(storedLanguage, language, StringComparison.Ordinal))
+            {
+                await settings.UpdateAsync(s => s.General.Language = language);
+                logger.LogInformation("Language initialized as {Language}", language);
+            }
+
             var theme = Services.GetRequiredService<IThemeService>();
             theme.Apply(settings.Settings);
             settings.SettingsChanged += (_, updated) =>
             {
+                var dispatcher = MainWindow?.DispatcherQueue;
+                if (dispatcher is null || dispatcher.HasThreadAccess)
+                {
+                    ApplySettings(updated);
+                }
+                else
+                {
+                    dispatcher.TryEnqueue(() => ApplySettings(updated));
+                }
+            };
+
+            void ApplySettings(AppSettings updated)
+            {
                 theme.Apply(updated);
                 Services.GetRequiredService<IAppLogger>().Initialize(
                     Services.GetRequiredService<IAppPaths>().LogsDirectory, updated.Processing.LogLevel);
-            };
+            }
 
             MainWindow = Services.GetRequiredService<MainWindow>();
             MainWindow.Activate();
             MainWindow.ApplyInitialPlacement();
             Services.GetRequiredService<IAppLogger>().LogInformation(
                 $"Startup: window activated at {StartupClock.Elapsed.TotalMilliseconds:0.0} ms");
+            _ = Task.Run(LocalizationService.WarmupPatterns);
+            ShellActivationService.StartServer(forwarded =>
+                MainWindow?.DispatcherQueue.TryEnqueue(async () => await HandleShellActivationAsync(forwarded)));
+            if (commandArgs.Length > 0)
+                _ = HandleShellActivationAsync(commandArgs);
+            if (settings.Settings.Updates.CheckOnStartup)
+                QueueStartupUpdateCheck();
             var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             dispatcher.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                 async () => await InitializeRuntimeAsync());
@@ -101,7 +155,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             var errorWindow = new Window
             {
-                Title = "PixelForge — startup error",
+                Title = LocalizationService.T("PixelForge - startup error"),
                 Content = new ScrollViewer
                 {
                     Padding = new Thickness(32),
@@ -110,7 +164,7 @@ public partial class App : Microsoft.UI.Xaml.Application
                         Spacing = 12,
                         Children =
                         {
-                            new TextBlock { Text = "PixelForge could not start.", FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold },
+                            new TextBlock { Text = LocalizationService.T("PixelForge could not start."), FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold },
                             new TextBlock { Text = ex.Message, TextWrapping = TextWrapping.Wrap },
                             new TextBlock { Text = ex.ToString(), FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"), FontSize = 12, TextWrapping = TextWrapping.Wrap }
                         }
@@ -118,6 +172,46 @@ public partial class App : Microsoft.UI.Xaml.Application
                 }
             };
             errorWindow.Activate();
+        }
+    }
+
+    private static void QueueStartupUpdateCheck()
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var updates = Services?.GetService<IUpdateService>();
+                var notifications = Services?.GetService<INotificationService>();
+                var settings = Services?.GetService<ISettingsService>();
+                if (updates is null || notifications is null || settings is null) return;
+                var result = await updates.CheckAsync(includePreReleases: false);
+                if (result.Outcome != UpdateCheckOutcome.UpdateAvailable || result.Release is null) return;
+                if (string.Equals(settings.Settings.Updates.LastNotifiedVersion,
+                        result.Release.Version, StringComparison.OrdinalIgnoreCase)) return;
+                await settings.UpdateAsync(s => s.Updates.LastNotifiedVersion = result.Release.Version);
+                MainWindow?.DispatcherQueue.TryEnqueue(() =>
+                    notifications.Notify("PixelForge update available",
+                        $"Version {result.Release.Version} is available. Open Settings > About to review it.",
+                        NotificationSeverity.Info));
+            }
+            catch
+            {
+                // The opt-in startup check must never disturb application startup.
+            }
+        });
+    }
+
+    private static async Task HandleShellActivationAsync(string[] args)
+    {
+        try
+        {
+            var shell = Services?.GetService<ShellPage>();
+            if (shell is not null) await shell.HandleShellActivationAsync(args);
+        }
+        catch (Exception ex)
+        {
+            try { Services?.GetService<IAppLogger>()?.LogError(ex, "Shell activation failed"); } catch { }
         }
     }
 
@@ -154,6 +248,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             notifications.Notify("PixelForge is ready", "Processing engines and the queue are initialized.",
                 NotificationSeverity.Success);
+            QueueLegacyLlamaRuntimeUpgrade(notifications, logger);
         }
         catch (Exception ex)
         {
@@ -161,6 +256,51 @@ public partial class App : Microsoft.UI.Xaml.Application
             notifications.Notify("Engine initialization failed",
                 "Open Settings → Diagnostics for details. Some conversion features may be unavailable.",
                 NotificationSeverity.Error, autoDismiss: false);
+        }
+    }
+
+    private static void QueueLegacyLlamaRuntimeUpgrade(INotificationService notifications, IAppLogger logger)
+    {
+        try
+        {
+            var upgrade = Services.GetRequiredService<LlamaCppRuntimeUpgradeService>();
+            if (upgrade.FindLegacyRuntimeDirectory() is null) return;
+
+            notifications.Notify("Updating OCR runtime",
+                "A newer llama.cpp Vulkan runtime is required. PixelForge is installing it in the background.",
+                NotificationSeverity.Info, autoDismiss: true);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var result = await upgrade.UpgradeAsync();
+                    switch (result.Outcome)
+                    {
+                        case LlamaCppRuntimeUpgradeOutcome.Updated:
+                        case LlamaCppRuntimeUpgradeOutcome.AlreadyCurrent:
+                            notifications.Notify("OCR runtime updated",
+                                "Advanced OCR is ready on the current llama.cpp Vulkan runtime.",
+                                NotificationSeverity.Success);
+                            break;
+                        case LlamaCppRuntimeUpgradeOutcome.Failed:
+                            notifications.Notify("OCR runtime update failed",
+                                result.Error ?? "Open AI Models to retry the llama.cpp runtime download.",
+                                NotificationSeverity.Warning, autoDismiss: false);
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "llama.cpp runtime upgrade failed");
+                    notifications.Notify("OCR runtime update failed",
+                        "Open AI Models to retry the llama.cpp runtime download.",
+                        NotificationSeverity.Warning, autoDismiss: false);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning($"Could not start the llama.cpp runtime upgrade: {ex.Message}");
         }
     }
 
@@ -193,6 +333,8 @@ public partial class App : Microsoft.UI.Xaml.Application
         try
         {
             if (_singleInstanceMutex is not null && _ownsMutex) _singleInstanceMutex.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+            _singleInstanceMutex = null;
         }
         catch
         {
@@ -218,7 +360,7 @@ public partial class App : Microsoft.UI.Xaml.Application
             if (dialog is not null)
             {
                 _ = dialog.ShowErrorAsync("Something went wrong",
-                    "PixelForge recovered from an unexpected error. Your files were not modified.",
+                    "PixelForge recovered from an unexpected error. A running job may have been interrupted; check the Queue and History for details.",
                     e.Exception?.ToString());
             }
         }

@@ -34,6 +34,35 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
         string prompt, bool useGpu, IProgress<ProcessingProgress> progress,
         CancellationToken cancellationToken = default)
     {
+        const int maxAttempts = 3;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await RecognizeAttemptAsync(model, pagePaths, prompt, useGpu, progress, cancellationToken);
+            }
+            catch (LoopbackPortUnavailableException) when (attempt < maxAttempts)
+            {
+                _logger.LogWarning(
+                    "The loopback OCR port became unavailable; retrying with another port (attempt {Attempt} of {Max}).",
+                    attempt, maxAttempts);
+            }
+            catch (LoopbackPortUnavailableException)
+            {
+                return new LlamaOcrResult
+                {
+                    Success = false,
+                    Error = "The advanced OCR server could not bind a loopback port.",
+                    Details = "Close other OCR jobs or applications using the loopback port and try again."
+                };
+            }
+        }
+    }
+
+    private async Task<LlamaOcrResult> RecognizeAttemptAsync(InstalledOcrModel model,
+        IReadOnlyList<string> pagePaths, string prompt, bool useGpu, IProgress<ProcessingProgress> progress,
+        CancellationToken cancellationToken)
+    {
         var descriptor = model.Descriptor;
         if (descriptor.MainModel is null || descriptor.MmprojModel is null)
             return new LlamaOcrResult { Success = false, Error = "The advanced OCR model manifest is incomplete." };
@@ -102,12 +131,17 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
                 Timeout = TimeSpan.FromMinutes(10)
             };
             if (!await WaitForReadyAsync(http, process, logs, cancellationToken))
+            {
+                if (process.HasExited && LooksLikePortConflict(logs))
+                    throw new LoopbackPortUnavailableException(
+                        "llama-server exited because the selected loopback port was already in use.", logs.ToArray());
                 return new LlamaOcrResult
                 {
                     Success = false,
                     Error = "The llama.cpp OCR server did not become ready.",
-                    Details = string.Join("\n", logs.TakeLast(20))
+                    Details = "Check that the runtime and model files are installed and that no other OCR job is running."
                 };
+            }
 
             var pages = new List<string>();
             for (var i = 0; i < pagePaths.Count; i++)
@@ -147,6 +181,10 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
         {
             throw;
         }
+        catch (LoopbackPortUnavailableException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Advanced OCR inference failed for {Model}", descriptor.Id);
@@ -154,7 +192,7 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
             {
                 Success = false,
                 Error = "Advanced OCR inference failed.",
-                Details = ex.Message + "\n" + string.Join("\n", logs.TakeLast(20))
+                Details = $"The OCR server process failed ({ex.GetType().Name}). Check the runtime and model files."
             };
         }
         finally
@@ -213,7 +251,7 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
             new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"), cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
-            return (false, "", $"The OCR server returned {(int)response.StatusCode}.", body);
+            return (false, "", $"The OCR server returned {(int)response.StatusCode}.", null);
 
         try
         {
@@ -228,9 +266,10 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
                     .Aggregate("", (a, b) => a + b);
             return (true, CleanMarkdown(text), null, null);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return (false, "", "The OCR server returned an unexpected response.", body + "\n" + ex.Message);
+            return (false, "", "The OCR server returned an unexpected response.",
+                "The recognized text could not be read. Try again or use the PP-OCR engine.");
         }
     }
 
@@ -256,7 +295,7 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
 
     private static string CleanMarkdown(string text)
     {
-        var value = text.Trim();
+        var value = RemoveRawBlocks(text.Trim());
         if (value.StartsWith("<md>", StringComparison.OrdinalIgnoreCase))
             value = value[4..].Trim();
         if (value.EndsWith("</md>", StringComparison.OrdinalIgnoreCase))
@@ -271,6 +310,61 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
         if (value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             value = value[prefix.Length..].TrimStart();
         return value.Trim();
+    }
+
+    /// <summary>
+    /// Drops fenced raw-format blocks emitted by the model. PixelForge adds its
+    /// own page-break fences after sanitisation; model-provided raw OpenXML
+    /// could otherwise inject arbitrary document parts through Pandoc.
+    /// </summary>
+    private static string RemoveRawBlocks(string value)
+    {
+        if (value.IndexOf("{=", StringComparison.Ordinal) < 0) return value;
+        var kept = new List<string>();
+        var inRaw = false;
+        var fenceChar = '\0';
+        var fenceLength = 0;
+        foreach (var line in value.Replace("\r\n", "\n").Split('\n'))
+        {
+            var trimmed = line.TrimStart();
+            if (!inRaw)
+            {
+                if (TryReadFence(trimmed, out var ch, out var length, out var info) &&
+                    info.StartsWith("{=", StringComparison.Ordinal))
+                {
+                    inRaw = true;
+                    fenceChar = ch;
+                    fenceLength = length;
+                    continue;
+                }
+
+                kept.Add(line);
+                continue;
+            }
+
+            if (TryReadFence(trimmed, out var closeChar, out var closeLength, out _) &&
+                closeChar == fenceChar && closeLength >= fenceLength)
+            {
+                inRaw = false;
+            }
+        }
+
+        return string.Join("\n", kept).Trim();
+    }
+
+    private static bool TryReadFence(string line, out char fence, out int length, out string info)
+    {
+        fence = '\0';
+        length = 0;
+        info = "";
+        if (line.Length < 3 || (line[0] != '`' && line[0] != '~')) return false;
+        fence = line[0];
+        var index = 0;
+        while (index < line.Length && line[index] == fence) index++;
+        if (index < 3) return false;
+        length = index;
+        info = line[index..].TrimStart();
+        return true;
     }
 
     private static string JoinPages(IReadOnlyList<string> pages)
@@ -296,5 +390,21 @@ public sealed class LlamaCppOcrService : ILlamaCppOcrService
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    private static bool LooksLikePortConflict(IReadOnlyCollection<string> logs)
+    {
+        string[] markers =
+        [
+            "bind", "address already in use", "only one usage", "permission denied", "access a socket"
+        ];
+        return logs.Any(line => markers.Any(marker =>
+            line.Contains(marker, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private sealed class LoopbackPortUnavailableException(string message, IReadOnlyList<string> logs)
+        : Exception(message)
+    {
+        public IReadOnlyList<string> Logs { get; } = logs;
     }
 }

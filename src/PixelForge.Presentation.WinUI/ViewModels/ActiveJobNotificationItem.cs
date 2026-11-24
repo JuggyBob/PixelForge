@@ -1,14 +1,20 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using PixelForge.Domain;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.ViewModels;
 
 public sealed partial class ActiveJobNotificationItem : ObservableObject
 {
-    public ActiveJobNotificationItem(ProcessingJob job)
+    private readonly Func<Guid, Task> _cancelJob;
+    private bool _cancelRequested;
+
+    public ActiveJobNotificationItem(ProcessingJob job, Func<Guid, Task> cancelJob)
     {
         JobId = job.Id;
+        _cancelJob = cancelJob;
         Update(job);
     }
 
@@ -20,6 +26,7 @@ public sealed partial class ActiveJobNotificationItem : ObservableObject
     [ObservableProperty] private double _progress;
     [ObservableProperty] private string _detail = "";
     [ObservableProperty] private string _glyph = "\uE8AB";
+    [ObservableProperty] private bool _canCancel;
 
     public void Update(ProcessingJob job)
     {
@@ -32,8 +39,12 @@ public sealed partial class ActiveJobNotificationItem : ObservableObject
             _ => job.StateText
         };
         Progress = job.Progress * 100;
-        ProgressText = job.ProgressText;
-        Detail = job.BatchSummary ?? job.Error ?? job.OperationText;
+        ProgressText = LocalizationService.T(job.ProgressText);
+        Detail = LocalizationService.LocalizeBatchSummary(job.BatchSummary) is { Length: > 0 } summary
+            ? summary
+            : job.Error ?? LocalizationService.T(job.OperationText);
+        CanCancel = !_cancelRequested && job.State is JobState.Pending or JobState.Preparing or JobState.Running;
+        if (job.IsTerminal) _cancelRequested = false;
         Glyph = job.Operation switch
         {
             OperationKind.ImageConvert => "\uE91B",
@@ -44,5 +55,22 @@ public sealed partial class ActiveJobNotificationItem : ObservableObject
             OperationKind.OcrDocument => "\uE8A5",
             _ => "\uE8AB"
         };
+    }
+
+    [RelayCommand]
+    private async Task CancelAsync()
+    {
+        if (!CanCancel || _cancelRequested) return;
+        _cancelRequested = true;
+        CanCancel = false;
+        try
+        {
+            await _cancelJob(JobId);
+        }
+        catch
+        {
+            _cancelRequested = false;
+            CanCancel = true;
+        }
     }
 }

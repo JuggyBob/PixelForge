@@ -1,3 +1,4 @@
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -27,7 +28,7 @@ public sealed partial class AudioWorkspaceViewModel : WorkspaceViewModel
     }
 
     public override OperationKind Operation => OperationKind.AudioConvert;
-    public override string CategoryTitle => "Audio";
+    public override string CategoryTitle => LocalizationService.T("Audio");
     public override string CategorySubtitle => "Transcode audio with verified codecs, sample rates and metadata.";
     public override string CategoryGlyph => "\uE8D6";
 
@@ -52,6 +53,19 @@ public sealed partial class AudioWorkspaceViewModel : WorkspaceViewModel
         new(AudioRateControlMode.ConstantBitrate, "Constant bitrate"),
         new(AudioRateControlMode.VariableQuality, "Variable quality")
     ];
+
+    public override void RefreshLocalization()
+    {
+        base.RefreshLocalization();
+        foreach (var option in BitrateOptions) option.RefreshLocalization();
+        foreach (var option in SampleRateOptions) option.RefreshLocalization();
+        foreach (var option in ChannelOptions) option.RefreshLocalization();
+        foreach (var option in RateControlOptions) option.RefreshLocalization();
+        SelectedBitrate.RefreshLocalization();
+        SelectedRateControl.RefreshLocalization();
+        SelectedSampleRate.RefreshLocalization();
+        SelectedChannels.RefreshLocalization();
+    }
 
     [ObservableProperty] private ObservableCollection<AudioCodecItem> _codecs = [];
     [ObservableProperty] private AudioCodecItem? _selectedCodec;
@@ -127,12 +141,14 @@ public sealed partial class AudioWorkspaceViewModel : WorkspaceViewModel
     {
         if (SelectedFormat is null || SelectedCodec is null) return "Choose an audio format";
         var rate = ShowVariableQuality
-            ? $"VBR {VariableQuality:0}"
-            : $"{SelectedBitrate.Value} kbps";
+            ? LocalizationService.F("VBR {0}", VariableQuality.ToString("0", LocalizationService.CurrentCulture))
+            : LocalizationService.F("{0} kbps", SelectedBitrate.Value);
         return $"{FileCountText} → {SelectedFormat.ExtensionUpper} · {SelectedCodec.DisplayName} · {rate}";
     }
 
-    protected override string BuildDefaultTitle() => $"Convert {FileCountText} to {SelectedFormat?.ExtensionUpper ?? "audio"}";
+    protected override string BuildDefaultTitle() =>
+        LocalizationService.F("Convert {0} to {1}", FileCountText,
+            SelectedFormat?.ExtensionUpper ?? LocalizationService.T("audio"));
 
     public override bool Accepts(MediaInfo info) =>
         info.Category == MediaCategory.Audio || (info.Category == MediaCategory.Video && info.AudioCodec is not null);

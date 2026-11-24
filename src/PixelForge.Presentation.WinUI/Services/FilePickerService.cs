@@ -1,5 +1,6 @@
 using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
+using PixelForge.Presentation.Localization;
 using Windows.Storage.Pickers;
 
 namespace PixelForge.Presentation.Services;
@@ -7,10 +8,14 @@ namespace PixelForge.Presentation.Services;
 public interface IFilePickerService
 {
     Task<IReadOnlyList<string>> PickFilesAsync(MediaCategory category);
+    Task<IReadOnlyList<string>> PickFilesAsync(IEnumerable<MediaCategory> categories);
     Task<IReadOnlyList<string>> PickUpscaleImagesAsync();
     Task<string?> PickFolderAsync(string? initialDirectory = null);
     Task<string?> PickModelFileAsync();
     Task<string?> PickFontFileAsync();
+    Task<string?> PickJsonSaveFileAsync(string suggestedName);
+    Task<string?> PickJsonOpenFileAsync();
+    Task<string?> PickTextSaveFileAsync(string suggestedName);
 }
 
 public sealed class FilePickerService : IFilePickerService
@@ -51,6 +56,27 @@ public sealed class FilePickerService : IFilePickerService
         return files?.Select(f => f.Path).Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
     }
 
+    public async Task<IReadOnlyList<string>> PickFilesAsync(IEnumerable<MediaCategory> categories)
+    {
+        var picker = new FileOpenPicker
+        {
+            ViewMode = PickerViewMode.List,
+            SuggestedStartLocation = PickerLocationId.PicturesLibrary
+        };
+        var extensions = categories
+            .Where(c => c != MediaCategory.Unknown)
+            .SelectMany(FormatCatalog.GetInputExtensions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (extensions.Count == 0)
+            extensions.Add("*");
+        foreach (var extension in extensions)
+            picker.FileTypeFilter.Add(extension);
+        Initialize(picker);
+        var files = await picker.PickMultipleFilesAsync();
+        return files?.Select(f => f.Path).Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
+    }
+
     public async Task<IReadOnlyList<string>> PickUpscaleImagesAsync()
     {
         var picker = new FileOpenPicker
@@ -70,7 +96,7 @@ public sealed class FilePickerService : IFilePickerService
         var picker = new FolderPicker
         {
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
-            CommitButtonText = "Use this folder"
+            CommitButtonText = Loc.T("Use this folder")
         };
         picker.FileTypeFilter.Add("*");
         Initialize(picker);
@@ -100,6 +126,45 @@ public sealed class FilePickerService : IFilePickerService
         };
         picker.FileTypeFilter.Add(".ttf");
         picker.FileTypeFilter.Add(".otf");
+        Initialize(picker);
+        var file = await picker.PickSingleFileAsync();
+        return file?.Path;
+    }
+
+    public async Task<string?> PickJsonSaveFileAsync(string suggestedName)
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = suggestedName
+        };
+        picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+        Initialize(picker);
+        var file = await picker.PickSaveFileAsync();
+        return file?.Path;
+    }
+
+    public async Task<string?> PickTextSaveFileAsync(string suggestedName)
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = suggestedName
+        };
+        picker.FileTypeChoices.Add("Text", new List<string> { ".txt" });
+        Initialize(picker);
+        var file = await picker.PickSaveFileAsync();
+        return file?.Path;
+    }
+
+    public async Task<string?> PickJsonOpenFileAsync()
+    {
+        var picker = new FileOpenPicker
+        {
+            ViewMode = PickerViewMode.List,
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+        };
+        picker.FileTypeFilter.Add(".json");
         Initialize(picker);
         var file = await picker.PickSingleFileAsync();
         return file?.Path;

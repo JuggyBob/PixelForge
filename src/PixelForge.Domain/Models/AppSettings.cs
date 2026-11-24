@@ -2,7 +2,7 @@ namespace PixelForge.Domain.Models;
 
 public sealed class AppSettings
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public GeneralSettings General { get; set; } = new();
     public ConverterDefaults Converter { get; set; } = new();
     public UpscalerDefaults Upscaler { get; set; } = new();
@@ -10,6 +10,7 @@ public sealed class AppSettings
     public OcrDefaults Ocr { get; set; } = new();
     public ProcessingSettings Processing { get; set; } = new();
     public StorageSettings Storage { get; set; } = new();
+    public UpdateSettings Updates { get; set; } = new();
     public WindowPlacement Window { get; set; } = new();
 
     public AppSettings Clone() => new()
@@ -22,6 +23,7 @@ public sealed class AppSettings
         Ocr = Ocr.Clone(),
         Processing = Processing.Clone(),
         Storage = Storage.Clone(),
+        Updates = Updates.Clone(),
         Window = Window.Clone()
     };
 }
@@ -29,6 +31,12 @@ public sealed class AppSettings
 public sealed class GeneralSettings
 {
     public ThemeMode Theme { get; set; } = ThemeMode.System;
+
+    /// <summary>
+    /// Stable BCP-47 UI language. An empty value means the Windows language is
+    /// detected once on first launch and then persisted.
+    /// </summary>
+    public string Language { get; set; } = "";
     public string AccentColorHex { get; set; } = "#D2693A";
     public string FontFamily { get; set; } = "Segoe UI Variable Text";
     public string MonoFontFamily { get; set; } = "JetBrains Mono";
@@ -39,6 +47,7 @@ public sealed class GeneralSettings
     public bool RememberLastPage { get; set; } = true;
     public string LastPage { get; set; } = "Home";
     public bool OpenOutputAfterJob { get; set; }
+    public bool OnboardingCompleted { get; set; }
 
     public GeneralSettings Clone() => (GeneralSettings)MemberwiseClone();
 }
@@ -111,6 +120,8 @@ public sealed class VideoUpscalerDefaults
     public string InterpolationModelId { get; set; } = "rife-4.25-lite";
     public int FrameRateMultiplier { get; set; } = 2;
     public int VideoBitrateKbps { get; set; } = 12000;
+    public bool EnableTemporalStability { get; set; }
+    public int TemporalStabilityStrength { get; set; } = 50;
     public string FileNameSuffix { get; set; } = "_upscaled";
     public bool IncludeSubfolders { get; set; } = true;
     public CollisionPolicy CollisionPolicy { get; set; } = CollisionPolicy.UniqueName;
@@ -125,6 +136,7 @@ public sealed class OcrDefaults
     public ExecutionProviderKind ExecutionProvider { get; set; } = ExecutionProviderKind.Auto;
     public bool GeneratePdf { get; set; }
     public bool Preprocess { get; set; } = true;
+    public bool ReviewBeforeExport { get; set; }
     public string DefaultOutputDirectory { get; set; } = "";
 
     public OcrDefaults Clone() => (OcrDefaults)MemberwiseClone();
@@ -149,6 +161,19 @@ public sealed class StorageSettings
     public int ThumbnailCacheDays { get; set; } = 30;
 
     public StorageSettings Clone() => (StorageSettings)MemberwiseClone();
+}
+
+public sealed class UpdateSettings
+{
+    /// <summary>Automatic checks are opt-in; manual checks always work.</summary>
+    public bool CheckOnStartup { get; set; }
+    public bool IncludePreReleases { get; set; }
+    public DateTimeOffset? LastCheckedAt { get; set; }
+    public string? LastNotifiedVersion { get; set; }
+    public string? CachedETag { get; set; }
+    public string? CachedReleaseJson { get; set; }
+
+    public UpdateSettings Clone() => (UpdateSettings)MemberwiseClone();
 }
 
 public sealed class WindowPlacement

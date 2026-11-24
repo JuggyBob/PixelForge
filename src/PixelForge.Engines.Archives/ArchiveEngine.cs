@@ -192,13 +192,15 @@ public sealed class ArchiveEngine : IProcessingEngine
             ProcessResult result;
             if (settings.Action == ArchiveAction.Repackage)
             {
+                var maxEntries = Math.Clamp(settings.MaxEntryCount, 1, HardMaxEntryCount);
+                var maxExpanded = Math.Clamp(settings.MaxExpandedBytes, 1, HardMaxExpandedBytes);
                 var extractDir = Path.Combine(workDir, "extracted");
                 Directory.CreateDirectory(extractDir);
                 var listing = await ListEntriesAsync(request.InputPath, cancellationToken);
                 if (listing.Error is not null) return ProcessingResult.Fail(listing.Error);
-                if (listing.Count > settings.MaxEntryCount)
+                if (listing.Count > maxEntries)
                     return ProcessingResult.Fail($"The archive contains too many entries ({listing.Count:N0}).");
-                if (listing.TotalSize > settings.MaxExpandedBytes)
+                if (listing.TotalSize > maxExpanded)
                     return ProcessingResult.Fail("The expanded archive is larger than the configured safety limit.");
                 var unsafePath = listing.Paths.FirstOrDefault(IsUnsafeEntryPath);
                 if (unsafePath is not null)
@@ -207,6 +209,10 @@ public sealed class ArchiveEngine : IProcessingEngine
                 var extract = await Run7zaAsync(["x", request.InputPath, $"-o{extractDir}", "-y"], workDir, cancellationToken);
                 if (!extract.Succeeded)
                     return ProcessingResult.Fail("The archive could not be extracted.", Tail(extract.StandardError), stopwatch.Elapsed);
+                var extractedVerification = VerifyExtractedFolder(extractDir, maxExpanded, requireFiles: false);
+                if (!extractedVerification.IsValid)
+                    return ProcessingResult.Fail(extractedVerification.Summary,
+                        extractedVerification.Details, stopwatch.Elapsed);
                 var entries = Directory.EnumerateFileSystemEntries(extractDir).ToList();
                 if (settings.OutputFormatId is "gz" or "bz2" or "xz" or "zst" && entries.Count != 1)
                     return ProcessingResult.Fail($"A .{settings.OutputFormatId} file can contain only one compressed file; the archive has {entries.Count} top-level entries.");
@@ -268,9 +274,11 @@ public sealed class ArchiveEngine : IProcessingEngine
             progress.Report(ProcessingProgress.Percent(0.1, "Reading archive contents…"));
             var listing = await ListEntriesAsync(request.InputPath, cancellationToken);
             if (listing.Error is not null) return ProcessingResult.Fail(listing.Error);
-            if (listing.Count > settings.MaxEntryCount)
+            var maxEntries = Math.Clamp(settings.MaxEntryCount, 1, HardMaxEntryCount);
+            var maxExpanded = Math.Clamp(settings.MaxExpandedBytes, 1, HardMaxExpandedBytes);
+            if (listing.Count > maxEntries)
                 return ProcessingResult.Fail($"The archive contains too many entries ({listing.Count:N0}).");
-            if (listing.TotalSize > settings.MaxExpandedBytes)
+            if (listing.TotalSize > maxExpanded)
                 return ProcessingResult.Fail("The expanded archive is larger than the configured safety limit.");
             var unsafePath = listing.Paths.FirstOrDefault(IsUnsafeEntryPath);
             if (unsafePath is not null)
@@ -285,7 +293,7 @@ public sealed class ArchiveEngine : IProcessingEngine
                     Tail(extract.StandardError), stopwatch.Elapsed);
 
             progress.Report(ProcessingProgress.Percent(0.8, "Validating extracted files…"));
-            var verification = VerifyExtractedFolder(extractDir, settings.MaxExpandedBytes);
+            var verification = VerifyExtractedFolder(extractDir, maxExpanded);
             if (!verification.IsValid)
                 return ProcessingResult.Fail(verification.Summary, verification.Details, stopwatch.Elapsed);
 
@@ -317,12 +325,23 @@ public sealed class ArchiveEngine : IProcessingEngine
         }
     }
 
-    private VerificationResult VerifyExtractedFolder(string path, long maxExpandedBytes)
+    private VerificationResult VerifyExtractedFolder(string path, long maxExpandedBytes, bool requireFiles = true)
     {
         if (!Directory.Exists(path))
             return VerificationResult.Fail("The extracted folder does not exist.");
-        var files = Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).ToList();
-        if (files.Count == 0)
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = 0,
+            IgnoreInaccessible = true
+        };
+        foreach (var entry in new DirectoryInfo(path).EnumerateFileSystemInfos("*", options))
+        {
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                return VerificationResult.Fail("The archive contains a symbolic link or reparse point and was rejected.");
+        }
+        var files = Directory.EnumerateFiles(path, "*", options).ToList();
+        if (requireFiles && files.Count == 0)
             return VerificationResult.Fail("The archive produced an empty folder.");
         long total = 0;
         foreach (var file in files)
@@ -355,14 +374,25 @@ public sealed class ArchiveEngine : IProcessingEngine
 
     private static void CopyDirectory(string source, string destination)
     {
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = 0,
+            IgnoreInaccessible = true
+        };
+        foreach (var entry in new DirectoryInfo(source).EnumerateFileSystemInfos("*", options))
+        {
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("The extracted archive contains a reparse point and cannot be copied safely.");
+        }
         Directory.CreateDirectory(destination);
-        foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        foreach (var directory in Directory.EnumerateDirectories(source, "*", options))
         {
             var relative = Path.GetRelativePath(source, directory);
             Directory.CreateDirectory(Path.Combine(destination, relative));
         }
 
-        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(source, "*", options))
         {
             var relative = Path.GetRelativePath(source, file);
             File.Copy(file, Path.Combine(destination, relative), overwrite: true);
@@ -426,7 +456,10 @@ public sealed class ArchiveEngine : IProcessingEngine
         var args = new List<string> { "a", "-t" + (target.TechnicalId ?? target.Id), outputPath, "-y", $"-mx={boundedLevel}" };
         if (singleEntry is not null)
         {
-            args.Add(singleEntry);
+            // Never pass a bare file name: 7-Zip treats a leading '-' as a
+            // command switch. Prefixing with a relative directory keeps the
+            // stored entry name while guaranteeing an operand.
+            args.Add("." + Path.DirectorySeparatorChar + singleEntry);
         }
         else
         {
@@ -471,13 +504,31 @@ public sealed class ArchiveEngine : IProcessingEngine
         return (paths, total, paths.Count, null);
     }
 
+    private const int HardMaxEntryCount = 100_000;
+    private const long HardMaxExpandedBytes = 20L * 1024 * 1024 * 1024;
+
     private static bool IsUnsafeEntryPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return true;
-        var normalized = path.Replace('/', '\\').TrimStart('\\');
-        if (normalized.Length >= 2 && normalized[1] == ':') return true;
+        if (path.IndexOf('\0') >= 0) return true;
+        if (path.Any(char.IsControl)) return true;
+
+        var normalized = path.Replace('/', '\\');
+        // Absolute, UNC, device and drive-qualified names are never valid
+        // relative archive entries. Reject alternate data stream colons too.
+        if (normalized.StartsWith('\\')) return true;
+        if (normalized.IndexOf(':') >= 0) return true;
         return normalized.Split('\\', StringSplitOptions.RemoveEmptyEntries)
-            .Any(part => part == ".." || part.Contains('\0'));
+            .Any(part =>
+            {
+                // Windows strips trailing dots/spaces, so ".. " can normalize
+                // to ".."; reject any such component outright.
+                var trimmed = part.TrimEnd(' ', '.');
+                return trimmed.Length == 0 ||
+                       trimmed is "." or ".." ||
+                       part.EndsWith('.') ||
+                       part.EndsWith(' ');
+            });
     }
 
     private async Task<ProcessResult> Run7zaAsync(IReadOnlyList<string> args, string workingDirectory,

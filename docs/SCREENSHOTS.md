@@ -1,6 +1,6 @@
 # Screenshot Gallery
 
-All images in this directory were captured from the actual PixelForge 1.0.0 application running in an isolated demonstration profile. The profile used synthetic files and neutral paths under `A:\PixelForge Demo`; no personal media, local usernames, documents, or browser windows are included.
+All images in this directory were captured from the real PixelForge application running with an isolated `PIXELFORGE_DATA_DIR` profile. The gallery uses synthetic demo content only; no personal media, local usernames, documents, or browser windows are included.
 
 | Image | Screen |
 |---|---|
@@ -14,11 +14,12 @@ All images in this directory were captured from the actual PixelForge 1.0.0 appl
 | `media-tools.png` | Media Tools |
 | `ai-upscaling.png` | Image Upscaler |
 | `ocr-documents.png` | OCR Documents |
+| `pipelines.png` | Pipelines list with a template-generated workflow |
+| `pipeline-editor.png` | Pipeline editor — node graph with expanded node settings |
 | `video-upscaler.png` | Video Upscaler |
 | `processing-queue.png` | Processing Queue with a completed AI upscale |
 | `history.png` | History with a completed operation |
 | `model-management.png` | Shared AI Models panel |
-| `settings.png` | Settings and appearance |
+| `settings.png` | Settings > General with the Language selector and appearance controls |
 
-The screenshots are 1800 × 1125 at the reference display scaling. They are committed as documentation assets and should be regenerated with the UI test harness after substantial visual changes.
-
+The screenshots are window-only captures, approximately 1784 × 1117 to 1800 × 1125 pixels at the reference display scaling. They are committed as documentation assets and should be regenerated with the UI test harness after substantial visual changes.

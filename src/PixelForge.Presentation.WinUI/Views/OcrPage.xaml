@@ -3,6 +3,7 @@
     x:Class="PixelForge.Presentation.Views.OcrPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="using:PixelForge.Presentation.Localization"
     xmlns:controls="using:PixelForge.Presentation.Controls"
     NavigationCacheMode="Required"
     AllowDrop="True"
@@ -28,16 +29,16 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="3">
-                <TextBlock Text="OCR Documents" Style="{StaticResource PageTitleTextStyle}"
+                <TextBlock loc:Loc.Text="OCR Documents" Style="{StaticResource PageTitleTextStyle}"
                            AutomationProperties.AutomationId="OcrTitle" />
-                <TextBlock Text="Turn scanned pages, photos and screenshots into one ordered, searchable document - fully offline."
+                <TextBlock loc:Loc.Text="Turn scanned pages, photos and screenshots into one ordered, searchable document - fully offline."
                            Style="{StaticResource PageSubtitleTextStyle}" />
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Border Style="{StaticResource StatusPillStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="7">
                         <Ellipse Width="7" Height="7" Fill="{ThemeResource AccentPrimaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding ModelBadge}" FontSize="11"
+                        <TextBlock Text="{Binding ModelBadge, Converter={StaticResource Localize}}" FontSize="11"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </Border>
@@ -65,22 +66,22 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="Document pages" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock loc:Loc.Text="Document pages" Style="{StaticResource SectionTitleTextStyle}" VerticalAlignment="Center" />
                             <Border Grid.Column="1" Style="{StaticResource FormatBadgeStyle}">
-                                <TextBlock Text="{Binding PageCount}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding PageCount, Converter={StaticResource Localize}}" FontSize="11" VerticalAlignment="Center" />
                             </Border>
                         </Grid>
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Content="Add images" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button loc:Loc.Content="Add images" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding AddImagesCommand}" AutomationProperties.AutomationId="OcrAddImages" />
-                            <Button Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button loc:Loc.Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding PasteImagesCommand}"
-                                    ToolTipService.ToolTip="Paste pages from the clipboard"
+                                    loc:Loc.ToolTip="Paste pages from the clipboard"
                                     AutomationProperties.AutomationId="OcrPaste" />
-                            <Button Content="Scan folder" Style="{StaticResource SecondaryButtonStyle}"
+                            <Button loc:Loc.Content="Scan folder" Style="{StaticResource SecondaryButtonStyle}"
                                     Command="{Binding ScanFolderCommand}" AutomationProperties.AutomationId="OcrScanFolder" />
                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding ClearPagesCommand}"
-                                    ToolTipService.ToolTip="Clear pages" AutomationProperties.Name="Clear OCR pages"
+                                    loc:Loc.ToolTip="Clear pages" loc:Loc.AutomationName="Clear OCR pages"
                                     AutomationProperties.AutomationId="OcrClear">
                                 <FontIcon Glyph="&#xE74D;" FontSize="14" />
                             </Button>
@@ -93,16 +94,16 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <CheckBox Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
+                            <CheckBox loc:Loc.Content="Include subfolders" MinHeight="0" VerticalAlignment="Center"
                                       IsChecked="{Binding ScanRecursive, Mode=TwoWay}"
-                                      AutomationProperties.Name="Include subfolders in OCR folder scans" />
+                                      loc:Loc.AutomationName="Include subfolders in OCR folder scans" />
                             <ProgressRing Grid.Column="1" IsActive="{Binding IsScanning}" Width="16" Height="16"
                                           HorizontalAlignment="Right" VerticalAlignment="Center"
                                           Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}" />
                         </Grid>
-                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" Title="Page import"
+                        <InfoBar IsOpen="{Binding HasScanSummary}" Severity="Informational" loc:Loc.Title="Page import"
                                  Message="{Binding ScanSummary}" IsClosable="False" />
-                        <Expander Header="Files ignored by this import" IsExpanded="False"
+                        <Expander loc:Loc.Header="Files ignored by this import" IsExpanded="False"
                                   Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVisibility}}"
                                   HorizontalAlignment="Stretch">
                             <ItemsControl ItemsSource="{Binding Skipped}" MaxHeight="140">
@@ -115,9 +116,9 @@
                                             </Grid.ColumnDefinitions>
                                             <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource WarningBrush}" />
                                             <StackPanel Grid.Column="1" Spacing="0">
-                                                <TextBlock Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold"
+                                                <TextBlock Text="{Binding FileName, Converter={StaticResource Localize}}" FontSize="11" FontWeight="SemiBold"
                                                            TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Reason}" FontSize="10"
+                                                <TextBlock Text="{Binding Reason, Converter={StaticResource Localize}}" FontSize="10"
                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>
@@ -137,9 +138,9 @@
                                         HorizontalAlignment="Center">
                                     <FontIcon Glyph="&#xE8A5;" FontSize="28" Foreground="{ThemeResource AccentTextBrush}" />
                                 </Border>
-                                <TextBlock Text="Drop scanned pages here" FontSize="17" FontWeight="SemiBold"
+                                <TextBlock loc:Loc.Text="Drop scanned pages here" FontSize="17" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" />
-                                <TextBlock Text="Add one or more images, or scan a folder. Pages keep the order shown here and are combined into a single DOCX."
+                                <TextBlock loc:Loc.Text="Add one or more images, or scan a folder. Pages keep the order shown here and are combined into a single DOCX."
                                            Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center" />
                                 <Grid ColumnSpacing="8" MaxWidth="440" HorizontalAlignment="Stretch">
                                     <Grid.ColumnDefinitions>
@@ -147,14 +148,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <Button Content="Choose images" Style="{StaticResource PrimaryButtonStyle}"
+                                    <Button loc:Loc.Content="Choose images" Style="{StaticResource PrimaryButtonStyle}"
                                             Command="{Binding AddImagesCommand}" HorizontalAlignment="Stretch" />
-                                    <Button Grid.Column="1" Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="1" loc:Loc.Content="Paste" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding PasteImagesCommand}" HorizontalAlignment="Stretch"
-                                            ToolTipService.ToolTip="Paste pages from the clipboard"
-                                            AutomationProperties.Name="Paste OCR pages"
-                                            AutomationProperties.HelpText="Paste a clipboard image or image files copied from File Explorer (Ctrl+V)." />
-                                    <Button Grid.Column="2" Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}"
+                                            loc:Loc.ToolTip="Paste pages from the clipboard"
+                                            loc:Loc.AutomationName="Paste OCR pages"
+                                            loc:Loc.HelpText="Paste a clipboard image or image files copied from File Explorer (Ctrl+V)." />
+                                    <Button Grid.Column="2" loc:Loc.Content="Scan a folder" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ScanFolderCommand}" HorizontalAlignment="Stretch" />
                                 </Grid>
                             </StackPanel>
@@ -184,7 +185,7 @@
 
                                         <Border Width="30" Height="30" CornerRadius="15"
                                                 Background="{ThemeResource AccentSubtleBrush}" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding PageNumber}" FontSize="12" FontWeight="SemiBold"
+                                            <TextBlock Text="{Binding PageNumber, Converter={StaticResource Localize}}" FontSize="12" FontWeight="SemiBold"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Foreground="{ThemeResource AccentTextBrush}" />
                                         </Border>
@@ -200,10 +201,10 @@
                                         </Border>
 
                                         <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding FileName}" FontSize="13" FontWeight="SemiBold"
+                                            <TextBlock Text="{Binding FileName, Converter={StaticResource Localize}}" FontSize="13" FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis"
-                                                       ToolTipService.ToolTip="{Binding FilePath}" />
-                                            <TextBlock Text="{Binding Detail}" FontSize="11"
+                                                       ToolTipService.ToolTip="{Binding FilePath, Converter={StaticResource Localize}}" />
+                                            <TextBlock Text="{Binding Detail, Converter={StaticResource Localize}}" FontSize="11"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                        TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
@@ -211,22 +212,22 @@
                                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding MoveUpCommand}"
                                                     IsEnabled="{Binding CanMoveUp}"
-                                                    ToolTipService.ToolTip="Move page up"
-                                                    AutomationProperties.Name="Move page up">
+                                                    loc:Loc.ToolTip="Move page up"
+                                                    loc:Loc.AutomationName="Move page up">
                                                 <FontIcon Glyph="&#xE74A;" FontSize="12" />
                                             </Button>
                                             <Button Style="{StaticResource IconButtonStyle}" Command="{Binding MoveDownCommand}"
                                                     IsEnabled="{Binding CanMoveDown}"
-                                                    ToolTipService.ToolTip="Move page down"
-                                                    AutomationProperties.Name="Move page down">
+                                                    loc:Loc.ToolTip="Move page down"
+                                                    loc:Loc.AutomationName="Move page down">
                                                 <FontIcon Glyph="&#xE74B;" FontSize="12" />
                                             </Button>
                                         </StackPanel>
 
                                         <Button Grid.Column="4" Style="{StaticResource IconButtonStyle}"
                                                 Command="{Binding RemoveCommand}"
-                                                ToolTipService.ToolTip="Remove page"
-                                                AutomationProperties.Name="Remove page from document">
+                                                loc:Loc.ToolTip="Remove page"
+                                                loc:Loc.AutomationName="Remove page from document">
                                             <FontIcon Glyph="&#xE711;" FontSize="12" />
                                         </Button>
                                     </Grid>
@@ -245,25 +246,25 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <StackPanel Padding="18,16,18,10" Spacing="2">
-                        <TextBlock Text="Document settings" Style="{StaticResource SectionTitleTextStyle}" />
-                        <TextBlock Text="One PDF-quality DOCX is produced per job; ordering follows this page list."
+                        <TextBlock loc:Loc.Text="Document settings" Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock loc:Loc.Text="One PDF-quality DOCX is produced per job; ordering follows this page list."
                                    Style="{StaticResource CaptionTextStyle}" />
                     </StackPanel>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,4,18,18">
                         <StackPanel Spacing="15">
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Document name" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Document name" Style="{StaticResource CaptionTextStyle}" />
                                 <TextBox Text="{Binding DocumentName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         PlaceholderText="ScannedDocument_OCR"
+                                         loc:Loc.Placeholder="ScannedDocument_OCR"
                                          AutomationProperties.AutomationId="OcrDocumentName" />
-                                <TextBlock Text="The DOCX and optional PDF use this name. A unique number is added when a file already exists."
+                                <TextBlock loc:Loc.Text="The DOCX and optional PDF use this name. A unique number is added when a file already exists."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="8">
-                                <TextBlock Text="Recognition model" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Recognition model" Style="{StaticResource CaptionTextStyle}" />
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -272,15 +273,15 @@
                                     <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
                                               DisplayMemberPath="Name" HorizontalAlignment="Stretch"
                                               AutomationProperties.AutomationId="OcrModelPicker" />
-                                    <Button Grid.Column="1" Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="1" loc:Loc.Content="Manage" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ManageModelsCommand}"
                                             AutomationProperties.AutomationId="OcrManageModels" />
                                 </Grid>
-                                <TextBlock Text="{Binding ModelStatus}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding ProviderStatus}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding SelectedModel.IntendedUse}" Style="{StaticResource CaptionTextStyle}"
+                                <TextBlock Text="{Binding ModelStatus, Converter={StaticResource Localize}}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ProviderStatus, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding SelectedModel.IntendedUse, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                            TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding SelectedModel.Notes}" Style="{StaticResource CaptionTextStyle}"
+                                <TextBlock Text="{Binding SelectedModel.Notes, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                            TextWrapping="Wrap" />
 
                                 <Grid ColumnSpacing="6">
@@ -289,14 +290,14 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Button Content="Download model" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button loc:Loc.Content="Download model" Style="{StaticResource SecondaryButtonStyle}"
                                             HorizontalAlignment="Stretch" Command="{Binding DownloadModelCommand}"
                                             Visibility="{Binding SelectedModel.CanDownload, Converter={StaticResource BoolToVisibility}}"
                                             AutomationProperties.AutomationId="OcrDownloadModel" />
-                                    <Button Grid.Column="1" Content="Cancel" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="1" loc:Loc.Content="Cancel" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding CancelModelDownloadCommand}"
                                             Visibility="{Binding SelectedModel.IsDownloading, Converter={StaticResource BoolToVisibility}}" />
-                                    <Button Grid.Column="2" Content="Remove" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="2" loc:Loc.Content="Remove" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding RemoveModelCommand}"
                                             Visibility="{Binding SelectedModel.CanRemove, Converter={StaticResource BoolToVisibility}}" />
                                 </Grid>
@@ -304,78 +305,83 @@
                                 <StackPanel Spacing="3"
                                             Visibility="{Binding SelectedModel.IsDownloading, Converter={StaticResource BoolToVisibility}}">
                                     <ProgressBar Minimum="0" Maximum="100" Value="{Binding SelectedModel.Progress}" Height="4" />
-                                    <TextBlock Text="{Binding SelectedModel.ProgressText}" Style="{StaticResource CaptionTextStyle}"
+                                    <TextBlock Text="{Binding SelectedModel.ProgressText, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <InfoBar IsOpen="{Binding SelectedModel.HasError}" Severity="Error" Title="Model download failed"
+                                <InfoBar IsOpen="{Binding SelectedModel.HasError}" Severity="Error" loc:Loc.Title="Model download failed"
                                          Message="{Binding SelectedModel.Error}" IsClosable="False" />
                                 <InfoBar IsOpen="{Binding SelectedModel.NeedsDownload}" Severity="Warning"
-                                         Title="Model download required"
-                                         Message="Download the selected model once. It is stored locally and verified with SHA-256 before use."
+                                         loc:Loc.Title="Model download required"
+                                         loc:Loc.Message="Download the selected model once. It is stored locally and verified with SHA-256 before use."
                                          IsClosable="False" />
-                                <TextBlock Text="{Binding ModelLanguageText}" Style="{StaticResource CaptionTextStyle}"
+                                <TextBlock Text="{Binding ModelLanguageText, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                            TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="8">
-                                <ToggleSwitch Header="Generate PDF companion"
+                                <ToggleSwitch loc:Loc.Header="Generate PDF companion"
                                               IsOn="{Binding GeneratePdf, Mode=TwoWay}"
                                               AutomationProperties.AutomationId="OcrGeneratePdf" />
-                                <TextBlock Text="The PDF is generated from the same DOCX content, so page order and text match."
+                                <TextBlock loc:Loc.Text="The PDF is generated from the same DOCX content, so page order and text match."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
-                                <ToggleSwitch Header="Preprocess page images"
+                                <ToggleSwitch loc:Loc.Header="Preprocess page images"
                                               IsOn="{Binding Preprocess, Mode=TwoWay}"
                                               AutomationProperties.AutomationId="OcrPreprocess" />
-                                <TextBlock Text="Normalizes page polarity and contrast before detection. Turn this off for already clean scans."
+                                <TextBlock loc:Loc.Text="Normalizes page polarity and contrast before detection. Turn this off for already clean scans."
+                                           Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
+                                <ToggleSwitch loc:Loc.Header="Review recognized text before export"
+                                              IsOn="{Binding ReviewBeforeExport, Mode=TwoWay}"
+                                              AutomationProperties.AutomationId="OcrReviewBeforeExport" />
+                                <TextBlock loc:Loc.Text="Recognizes the pages first and opens an editable text review. The reviewed text is used to build the DOCX without running recognition again."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Page order" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Page order" Style="{StaticResource CaptionTextStyle}" />
                                 <ComboBox ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSort, Mode=TwoWay}"
-                                          DisplayMemberPath="Label" HorizontalAlignment="Stretch"
+                                          DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch"
                                           AutomationProperties.AutomationId="OcrSortMode" />
-                                <TextBlock Text="Applied to the current page list and to newly scanned folders. Use the arrow buttons to adjust pages by hand."
+                                <TextBlock loc:Loc.Text="Applied to the current page list and to newly scanned folders. Use the arrow buttons to adjust pages by hand."
                                            Style="{StaticResource CaptionTextStyle}" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="{ThemeResource DividerBrush}" />
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="Destination" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="Destination" Style="{StaticResource CaptionTextStyle}" />
                                 <Grid ColumnSpacing="6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <Border Background="{ThemeResource SubtleSurfaceBrush}" CornerRadius="6" Padding="9,6">
-                                        <TextBlock Text="{Binding OutputDirectory}" FontSize="11" TextTrimming="CharacterEllipsis"
-                                                   ToolTipService.ToolTip="{Binding OutputDirectory}" />
+                                        <TextBlock Text="{Binding OutputDirectory, Converter={StaticResource Localize}}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding OutputDirectory, Converter={StaticResource Localize}}" />
                                     </Border>
-                                    <Button Grid.Column="1" Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
+                                    <Button Grid.Column="1" loc:Loc.Content="Choose" Style="{StaticResource SecondaryButtonStyle}"
                                             Command="{Binding ChooseOutputCommand}"
                                             AutomationProperties.AutomationId="OcrChooseOutput" />
                                 </Grid>
                             </StackPanel>
 
                             <StackPanel Spacing="4">
-                                <TextBlock Text="If a document already exists" Style="{StaticResource CaptionTextStyle}" />
+                                <TextBlock loc:Loc.Text="If a document already exists" Style="{StaticResource CaptionTextStyle}" />
                                 <ComboBox ItemsSource="{Binding CollisionOptions}" SelectedItem="{Binding SelectedCollision, Mode=TwoWay}"
-                                          DisplayMemberPath="Label" HorizontalAlignment="Stretch" />
+                                          DisplayMemberPath="DisplayLabel" HorizontalAlignment="Stretch" />
                             </StackPanel>
 
                             <StackPanel Spacing="8"
                                         Visibility="{Binding HasValidationErrors, Converter={StaticResource BoolToVisibility}}">
-                                <InfoBar IsOpen="True" Severity="Error" Title="Cannot start"
+                                <InfoBar IsOpen="True" Severity="Error" loc:Loc.Title="Cannot start"
                                          Message="{Binding ValidationSummary}" />
                             </StackPanel>
                             <StackPanel Spacing="8"
                                         Visibility="{Binding HasValidationWarnings, Converter={StaticResource BoolToVisibility}}">
-                                <InfoBar IsOpen="True" Severity="Warning" Title="Review before processing"
+                                <InfoBar IsOpen="True" Severity="Warning" loc:Loc.Title="Review before processing"
                                          Message="{Binding ValidationSummary}" />
                             </StackPanel>
                         </StackPanel>
@@ -391,23 +397,23 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="2" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding FooterStatus}" FontSize="13" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding FooterStatus, Converter={StaticResource Localize}}" FontSize="13" FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding OutputDirectory}" Style="{StaticResource CaptionTextStyle}"
+                    <TextBlock Text="{Binding OutputDirectory, Converter={StaticResource Localize}}" Style="{StaticResource CaptionTextStyle}"
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <Button Content="Open DOCX" Style="{StaticResource SecondaryButtonStyle}"
+                    <Button loc:Loc.Content="Open DOCX" Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding OpenDocxCommand}" IsEnabled="{Binding HasOutput}"
                             AutomationProperties.AutomationId="OcrOpenDocx" />
-                    <Button Content="Open PDF" Style="{StaticResource SecondaryButtonStyle}"
+                    <Button loc:Loc.Content="Open PDF" Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding OpenPdfCommand}" IsEnabled="{Binding HasOutput}"
                             Visibility="{Binding GeneratePdf, Converter={StaticResource BoolToVisibility}}"
                             AutomationProperties.AutomationId="OcrOpenPdf" />
-                    <Button Content="Open folder" Style="{StaticResource SecondaryButtonStyle}"
+                    <Button loc:Loc.Content="Open folder" Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding OpenOutputFolderCommand}"
                             AutomationProperties.AutomationId="OcrOpenFolder" />
-                    <Button Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}"
+                    <Button loc:Loc.Content="Add to queue" Style="{StaticResource PrimaryButtonStyle}"
                             Command="{Binding AddToQueueCommand}" IsEnabled="{Binding CanQueue}"
                             AutomationProperties.AutomationId="OcrAddToQueue" />
                 </StackPanel>

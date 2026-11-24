@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using PixelForge.Presentation.Localization;
+
 namespace PixelForge.Presentation.Services;
 
 public enum ModelPanelFilter
@@ -9,9 +12,13 @@ public enum ModelPanelFilter
     Ocr
 }
 
-public sealed record ModelFilterOption(ModelPanelFilter Value, string Label)
+public sealed record ModelFilterOption(ModelPanelFilter Value, string Label) : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
 }
 
 public interface IModelPanelService

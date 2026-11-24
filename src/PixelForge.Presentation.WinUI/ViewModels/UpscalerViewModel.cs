@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -7,19 +8,22 @@ using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
 
 public sealed record ScanSkipItem(string FileName, string Reason, bool IsUnsupported);
 
-public sealed class UpscaleModelItem
+public sealed class UpscaleModelItem : INotifyPropertyChanged
 {
     public UpscaleModelItem(ModelDescriptor descriptor, InstalledModel? installed)
     {
         Descriptor = descriptor;
         Installed = installed;
     }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public ModelDescriptor Descriptor { get; }
     public InstalledModel? Installed { get; }
@@ -30,30 +34,47 @@ public sealed class UpscaleModelItem
     public string IntendedUse => Descriptor.IntendedUse;
     public string ScaleText => Descriptor.Task switch
     {
-        ModelTask.FrameInterpolation => "Frame interpolation",
-        ModelTask.ImageRestore => "Restoration · 1×",
+        ModelTask.FrameInterpolation => Loc.T("Frame interpolation"),
+        ModelTask.ImageRestore => Loc.T("Restoration · 1×"),
         _ => $"{Descriptor.ScaleFactor}×"
     };
     public string SizeText => Descriptor.DisplaySize;
     public string Tags => string.Join(" · ", Descriptor.Tags);
     public bool IsInstalled => Installed is { IsValid: true };
     public bool NeedsValidation => Installed is { IsValid: false };
-    public string StatusText => IsInstalled ? "Installed" : NeedsValidation ? "Needs validation" : "Not installed";
+    public string StatusText => IsInstalled
+        ? Loc.T("Installed")
+        : NeedsValidation ? Loc.T("Needs validation") : Loc.T("Not installed");
     public string Detail => IsInstalled
-        ? $"{Descriptor.ScaleFactor}× · {Descriptor.DisplaySize} · installed"
-        : $"{Descriptor.ScaleFactor}× · {Descriptor.DisplaySize} · download required";
+        ? Loc.F("{0}× · {1} · installed", Descriptor.ScaleFactor, Descriptor.DisplaySize)
+        : Loc.F("{0}× · {1} · download required", Descriptor.ScaleFactor, Descriptor.DisplaySize);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
     public override string ToString() => Name;
 }
 
 public sealed record ProviderChoice(ExecutionProviderKind Kind, string Label, bool IsAvailable, string Detail)
+    : INotifyPropertyChanged
 {
-    public string DisplayName => IsAvailable ? Label : Label + " (unavailable)";
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public string DisplayName => IsAvailable ? DisplayLabel : LocalizationService.F("{0} (unavailable)", DisplayLabel);
     public override string ToString() => DisplayName;
+    public void RefreshLocalization()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+    }
 }
 
 public sealed record UpscaleFormatChoice(string Id, string Label, string Extension, bool IsLossy, bool IsAuto)
+    : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public override string ToString() => DisplayLabel;
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
 }
 
 public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
@@ -79,6 +100,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _validationCts;
     private bool _initialized;
     private bool _disposed;
+    private FolderScanResult? _lastScanResult;
 
     public UpscalerViewModel(ICapabilityRegistry registry, IMediaInspector inspector, IFolderScanner scanner,
         IThumbnailService thumbnails, IFilePickerService filePicker, IJobService jobs, IModelManager models,
@@ -133,6 +155,24 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
         new(CollisionPolicy.Overwrite, "Replace existing files", "Overwrite after confirmation.")
     ];
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in Algorithms) option.RefreshLocalization();
+        foreach (var option in ScaleOptions) option.RefreshLocalization();
+        foreach (var option in NoiseLevels) option.RefreshLocalization();
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var provider in Providers) provider.RefreshLocalization();
+        foreach (var format in OutputFormats) format.RefreshLocalization();
+        foreach (var model in Models) model.RefreshLocalization();
+        SelectedNoiseLevel?.RefreshLocalization();
+        UpdateModelStatusText();
+        UpdateProviderStatus();
+        RefreshSummary();
+        if (_lastScanResult is not null && !IsScanning)
+            ScanSummary = LocalizationService.ScanSummary(_lastScanResult);
+    }
+
     [ObservableProperty] private bool _isTraditional = true;
     [ObservableProperty] private bool _isAi;
     [ObservableProperty] private Option<ResamplingAlgorithm>? _selectedAlgorithm;
@@ -182,23 +222,25 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
                                   NoiseLevels.Count > 0;
     public string NoiseLevelHint => SelectedNoiseLevel?.Value switch
     {
-        -1 => "No denoising; closest to the original pixels.",
-        0 => "Conservative restoration with minimal texture removal.",
-        1 => "Light denoising.",
-        2 => "Balanced denoising.",
-        3 => "Strong denoising for noisy or heavily compressed sources.",
+        -1 => Loc.T("No denoising; closest to the original pixels."),
+        0 => Loc.T("Conservative restoration with minimal texture removal."),
+        1 => Loc.T("Light denoising."),
+        2 => Loc.T("Balanced denoising."),
+        3 => Loc.T("Strong denoising for noisy or heavily compressed sources."),
         _ => ""
     };
     public bool ShowOutputQuality => SelectedOutputFormat is { IsAuto: false, IsLossy: true } || SelectedOutputFormat is { IsAuto: true };
     public string ScaleHint => SelectedScale?.Value == 0
-        ? "Exact output dimensions"
+        ? Loc.T("Exact output dimensions")
         : SelectedModel?.Descriptor.Task == ModelTask.ImageRestore
             ? SelectedScale?.Value == 1
-                ? "Restoration model · output stays at the source resolution."
-                : $"{SelectedModel.Name} is a 1× restoration model; a conventional {SelectedScale?.Value}× resize will be applied after restoration."
+                ? Loc.T("Restoration model · output stays at the source resolution.")
+                : Loc.F("{0} is a 1× restoration model; a conventional {1}× resize will be applied after restoration.",
+                    SelectedModel.Name, SelectedScale?.Value)
             : SelectedModel is { IsInstalled: true } model && !UseCustomSize && SelectedScale?.Value != model.Descriptor.ScaleFactor
-                ? $"{model.Descriptor.Name} is {model.Descriptor.ScaleFactor}×; a secondary resize will produce {SelectedScale?.Value}×."
-                : "Native scale";
+                ? Loc.F("{0} is {1}×; a secondary resize will produce {2}×.",
+                    model.Descriptor.Name, model.Descriptor.ScaleFactor, SelectedScale?.Value)
+                : Loc.T("Native scale");
     public bool HasSelectedModel => SelectedModel?.IsInstalled == true;
     public string SelectedModelDetail => SelectedModel is null
         ? "No model selected"
@@ -321,18 +363,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
 
     private void RefreshModelState()
     {
-        if (SelectedModel is null)
-        {
-            ModelStatus = "No AI model available";
-        }
-        else if (SelectedModel.IsInstalled)
-        {
-            ModelStatus = $"{SelectedModel.Name} · {SelectedModel.ScaleText} · installed";
-        }
-        else
-        {
-            ModelStatus = $"{SelectedModel.Name} · download required";
-        }
+        UpdateModelStatusText();
 
         RefreshNoiseLevels();
         OnPropertyChanged(nameof(HasSelectedModel));
@@ -342,6 +373,22 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(NoiseLevelHint));
         UpdateProviderStatus();
         UpdateCanQueue();
+    }
+
+    private void UpdateModelStatusText()
+    {
+        if (SelectedModel is null)
+        {
+            ModelStatus = Loc.T("No AI model available");
+        }
+        else if (SelectedModel.IsInstalled)
+        {
+            ModelStatus = Loc.F("{0} · {1} · installed", SelectedModel.Name, SelectedModel.ScaleText);
+        }
+        else
+        {
+            ModelStatus = Loc.F("{0} · download required", SelectedModel.Name);
+        }
     }
 
     private void RefreshNoiseLevels()
@@ -375,7 +422,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
         if (SelectedProvider is null) return;
         if (SelectedModel?.Descriptor.CpuOnly == true && SelectedProvider.Kind != ExecutionProviderKind.Cpu)
         {
-            ProviderStatus = "CPU only for this model · DirectML is disabled after a verified native crash";
+            ProviderStatus = Loc.T("CPU only for this model · DirectML is disabled after a verified native crash");
         }
         else if (SelectedProvider.Kind == ExecutionProviderKind.Auto)
         {
@@ -383,32 +430,32 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
             {
                 var vulkan = Providers.FirstOrDefault(p => p.Kind == ExecutionProviderKind.Vulkan);
                 ProviderStatus = vulkan?.IsAvailable == true
-                    ? "Automatic · Vulkan preferred for this NCNN model"
-                    : "Automatic · NCNN CPU fallback";
+                    ? Loc.T("Automatic · Vulkan preferred for this NCNN model")
+                    : Loc.T("Automatic · NCNN CPU fallback");
             }
             else
             {
                 var dml = Providers.FirstOrDefault(p => p.Kind == ExecutionProviderKind.DirectML);
                 ProviderStatus = dml?.IsAvailable == true
-                    ? "Automatic · DirectML preferred"
-                    : "Automatic · CPU fallback";
+                    ? Loc.T("Automatic · DirectML preferred")
+                    : Loc.T("Automatic · CPU fallback");
             }
         }
         else if (SelectedProvider.Kind == ExecutionProviderKind.Vulkan &&
                  SelectedModel?.Descriptor.Backend != ModelBackendKind.NcnnVulkan)
         {
-            ProviderStatus = "Vulkan applies to NCNN models · this ONNX model uses DirectML/CPU";
+            ProviderStatus = Loc.T("Vulkan applies to NCNN models · this ONNX model uses DirectML/CPU");
         }
         else if (SelectedProvider.Kind == ExecutionProviderKind.DirectML &&
                  SelectedModel?.Descriptor.Backend == ModelBackendKind.NcnnVulkan)
         {
-            ProviderStatus = "NCNN uses Vulkan instead of DirectML · the GPU path is still used";
+            ProviderStatus = Loc.T("NCNN uses Vulkan instead of DirectML · the GPU path is still used");
         }
         else
         {
             ProviderStatus = SelectedProvider.IsAvailable
                 ? SelectedProvider.Detail
-                : $"{SelectedProvider.Label} is not available on this system.";
+                : Loc.F("{0} is not available on this system.", Loc.T(SelectedProvider.Label));
         }
         OnPropertyChanged(nameof(ProviderStatus));
     }
@@ -428,6 +475,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
     public async Task AddImagesAsync(IReadOnlyList<string> paths)
     {
         if (paths.Count == 0) return;
+        _lastScanResult = null;
         await _importGate.WaitAsync();
         try
         {
@@ -443,7 +491,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
             var processed = 0;
 
             IsScanning = true;
-            ScanSummary = $"Inspecting {candidates.Count} image{(candidates.Count == 1 ? "" : "s")}…";
+            ScanSummary = LocalizationService.P("Upscaler.Inspecting", candidates.Count);
             HasScanSummary = true;
             UpdateFileState();
 
@@ -500,19 +548,20 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
                     UpdateFileState();
                 }
 
-                ScanSummary = $"Adding images… {processed}/{candidates.Count} · {Files.Count} ready";
+                ScanSummary = LocalizationService.F("Adding images… {0}/{1} · {2} ready", processed, candidates.Count, Files.Count);
             }
 
             foreach (var item in skipped) Skipped.Add(item);
             HasSkipped = Skipped.Count > 0;
             if (skipped.Count > 0)
             {
-                ScanSummary = $"{(Files.Count == 1 ? "1 image" : $"{Files.Count} images")} ready · {skipped.Count} skipped";
-                _notifications.Notify("Some images were skipped", $"{skipped.Count} file(s) could not be upscaled.", NotificationSeverity.Warning);
+                ScanSummary = LocalizationService.F("{0} ready · {1} skipped", LocalizationService.P("Count.Image", Files.Count), skipped.Count);
+                _notifications.Notify("Some images were skipped",
+                    LocalizationService.P("Upscaler.SkippedFiles", skipped.Count), NotificationSeverity.Warning);
             }
             else if (Files.Count > 0)
             {
-                ScanSummary = $"{(Files.Count == 1 ? "1 image" : $"{Files.Count} images")} ready";
+                ScanSummary = LocalizationService.F("{0} ready", LocalizationService.P("Count.Image", Files.Count));
             }
 
             _logger.LogInformation(
@@ -538,14 +587,15 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
 
     public async Task AddFolderAsync(string folder)
     {
+        _lastScanResult = null;
         IsScanning = true;
-        ScanSummary = "Scanning folder…";
+        ScanSummary = Loc.T("Scanning folder…");
         HasScanSummary = true;
         try
         {
             var progress = new Progress<int>(count =>
             {
-                _dispatcher.TryEnqueue(() => ScanSummary = $"Scanning folder… {count} files checked");
+                _dispatcher.TryEnqueue(() => ScanSummary = LocalizationService.P("Scan.CheckedFiles", count));
             });
             var result = await _scanner.ScanAsync(new FolderScanRequest
             {
@@ -567,7 +617,8 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
                     PreserveFolderStructure ? file.RelativeDirectory : null));
             }
 
-            ScanSummary = result.Summary + (result.Warning is null ? "" : " · " + result.Warning);
+            ScanSummary = LocalizationService.ScanSummary(result);
+            _lastScanResult = result;
             HasScanSummary = true;
             HasSkipped = Skipped.Count > 0;
             if (result.IncludedCount == 0)
@@ -577,7 +628,8 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
             }
             else
             {
-                _notifications.Notify("Folder scan complete", result.Summary, NotificationSeverity.Success);
+                _notifications.Notify("Folder scan complete",
+                    LocalizationService.ScanSummary(result), NotificationSeverity.Success);
             }
         }
         catch (Exception ex)
@@ -618,6 +670,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
             Files.Clear();
             Skipped.Clear();
             HasSkipped = false;
+            _lastScanResult = null;
             ScanSummary = "";
             HasScanSummary = false;
             UpdateFileState();
@@ -718,8 +771,8 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
         {
             Operation = IsAi ? OperationKind.UpscaleAi : OperationKind.UpscaleTraditional,
             Title = IsAi
-                ? $"AI upscale {Files.Count} image{(Files.Count == 1 ? "" : "s")} · {settings.ScaleFactor}×"
-                : $"Upscale {Files.Count} image{(Files.Count == 1 ? "" : "s")} · {settings.ScaleFactor}×",
+                ? LocalizationService.F("AI upscale {0} · {1}×", LocalizationService.P("Count.Image", Files.Count), settings.ScaleFactor)
+                : LocalizationService.F("Upscale {0} · {1}×", LocalizationService.P("Count.Image", Files.Count), settings.ScaleFactor),
             Settings = settings,
             Inputs = Files.Select(f => new JobInput
             {
@@ -738,6 +791,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
             Skipped.Clear();
             HasSkipped = false;
             HasScanSummary = false;
+            _lastScanResult = null;
             ScanSummary = "";
             UpdateFileState();
             _navigation.Navigate("Queue");
@@ -773,16 +827,16 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
     {
         if (Files.Count == 0)
         {
-            Summary = "Import images or scan a folder to begin";
+            Summary = Loc.T("Import images or scan a folder to begin");
             return;
         }
 
-        var method = IsAi ? "AI" : SelectedAlgorithm?.Label ?? "Lanczos";
+        var method = IsAi ? Loc.T("AI") : Loc.T(SelectedAlgorithm?.Label ?? "Lanczos");
         var model = IsAi && SelectedModel is not null ? $" · {SelectedModel.Name}" : "";
         var scale = UseCustomSize || SelectedScale?.Value == 0
             ? $" · {(CustomWidth?.ToString("0") ?? "auto")}×{(CustomHeight?.ToString("0") ?? "auto")}"
             : $" · {SelectedScale?.Value}×";
-        Summary = $"{Files.Count} image{(Files.Count == 1 ? "" : "s")} · {method}{model}{scale}";
+        Summary = Loc.F("{0} · {1}{2}{3}", Loc.P("Count.Image", Files.Count), method, model, scale);
         OnPropertyChanged(nameof(Summary));
     }
 
@@ -859,7 +913,7 @@ public sealed partial class UpscalerViewModel : ObservableObject, IDisposable
     {
         HasValidationErrors = result?.Errors.Count > 0;
         HasValidationWarnings = result?.Warnings.Count > 0;
-        ValidationSummary = result?.Summary ?? "";
+        ValidationSummary = LocalizationService.ValidationSummary(result);
         OnPropertyChanged(nameof(HasValidationErrors));
         OnPropertyChanged(nameof(HasValidationWarnings));
         OnPropertyChanged(nameof(ValidationSummary));

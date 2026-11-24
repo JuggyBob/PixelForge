@@ -113,53 +113,35 @@ public sealed class NcnnRuntimeManager : INcnnRuntimeManager
         await _gate.WaitAsync(cancellationToken);
         string? tempZip = null;
         string? tempExtract = null;
+        var preservePartial = false;
         try
         {
             Directory.CreateDirectory(RuntimeDirectory);
             tempZip = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName + ".download.zip");
             tempExtract = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName + ".extract");
-            if (File.Exists(tempZip)) File.Delete(tempZip);
             if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, recursive: true);
 
             _logger.LogInformation("Downloading NCNN runtime {Runtime} from {Url}", descriptor.Id, descriptor.DownloadUrl);
-            using var request = new HttpRequestMessage(HttpMethod.Get, descriptor.DownloadUrl);
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            try
+            {
+                await ResumableDownloader.DownloadAsync(_httpClient, descriptor.DownloadUrl, tempZip,
+                    descriptor.FileSizeBytes,
+                    (received, total) => progress?.Report(new NcnnRuntimeDownloadProgress
+                    {
+                        RuntimeId = descriptor.Id,
+                        BytesReceived = received,
+                        TotalBytes = total,
+                        Stage = "Downloading"
+                    }), cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return new NcnnRuntimeDownloadResult
                 {
                     Success = false,
-                    Error = $"The runtime server returned {(int)response.StatusCode} {response.ReasonPhrase}.",
+                    Error = ex.Message,
                     Details = descriptor.DownloadUrl
                 };
-            }
-
-            var total = response.Content.Headers.ContentLength ?? descriptor.FileSizeBytes;
-            await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken))
-            await using (var target = new FileStream(tempZip, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                             128 * 1024, useAsync: true))
-            {
-                var buffer = new byte[128 * 1024];
-                long received = 0;
-                var lastReport = 0L;
-                while (true)
-                {
-                    var read = await source.ReadAsync(buffer, cancellationToken);
-                    if (read <= 0) break;
-                    await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    received += read;
-                    if (Environment.TickCount64 - lastReport > 120)
-                    {
-                        lastReport = Environment.TickCount64;
-                        progress?.Report(new NcnnRuntimeDownloadProgress
-                        {
-                            RuntimeId = descriptor.Id,
-                            BytesReceived = received,
-                            TotalBytes = total,
-                            Stage = "Downloading"
-                        });
-                    }
-                }
             }
 
             progress?.Report(new NcnnRuntimeDownloadProgress
@@ -222,8 +204,7 @@ public sealed class NcnnRuntimeManager : INcnnRuntimeManager
             });
 
             var finalDirectory = Path.Combine(RuntimeDirectory, descriptor.InstallDirectoryName);
-            if (Directory.Exists(finalDirectory)) Directory.Delete(finalDirectory, recursive: true);
-            Directory.Move(tempExtract, finalDirectory);
+            InstallDirectoryTransactional(tempExtract, finalDirectory);
             tempExtract = null;
 
             var installed = Inspect(descriptor, new IndexEntry(descriptor.Id, descriptor.Version, hash, DateTimeOffset.Now));
@@ -243,6 +224,7 @@ public sealed class NcnnRuntimeManager : INcnnRuntimeManager
         }
         catch (OperationCanceledException)
         {
+            preservePartial = true;
             return new NcnnRuntimeDownloadResult { Success = false, Error = "The runtime download was cancelled." };
         }
         catch (Exception ex)
@@ -257,11 +239,11 @@ public sealed class NcnnRuntimeManager : INcnnRuntimeManager
         }
         finally
         {
-            if (tempZip is not null)
+            if (tempZip is not null && !preservePartial)
             {
                 try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
             }
-            if (tempExtract is not null)
+            if (tempExtract is not null && !preservePartial)
             {
                 try { if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, recursive: true); } catch { }
             }
@@ -511,6 +493,32 @@ public sealed class NcnnRuntimeManager : INcnnRuntimeManager
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Could not save the installed NCNN runtime index");
+        }
+    }
+
+    private static void InstallDirectoryTransactional(string staging, string destination)
+    {
+        var backup = destination + ".backup";
+        if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        if (Directory.Exists(destination)) Directory.Move(destination, backup);
+        try
+        {
+            Directory.Move(staging, destination);
+            if (Directory.Exists(backup)) Directory.Delete(backup, recursive: true);
+        }
+        catch
+        {
+            try
+            {
+                if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
+                if (Directory.Exists(backup)) Directory.Move(backup, destination);
+            }
+            catch
+            {
+                // Keep the original error; a leftover backup remains recoverable.
+            }
+
+            throw;
         }
     }
 

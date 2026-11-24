@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.Input;
@@ -8,13 +11,27 @@ using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
 using PixelForge.Presentation.Converters;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
 
-public sealed record HistoryFilter(OperationKind? Operation, string Label)
+public sealed record HistoryFilter(OperationKind? Operation, string Label) : INotifyPropertyChanged
 {
-    public override string ToString() => Label;
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
+}
+
+public sealed record HistoryStatusFilter(JobItemState? Status, string Label) : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public string DisplayLabel => LocalizationService.T(Label);
+    public void RefreshLocalization() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+    public override string ToString() => DisplayLabel;
 }
 
 public sealed partial class HistoryViewModel : ObservableObject, IDisposable
@@ -23,6 +40,7 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
     private readonly IJobService _jobs;
     private readonly IMediaInspector _inspector;
     private readonly IOperationSettingsSerializer _serializer;
+    private readonly IFilePickerService _filePicker;
     private readonly INavigationService _navigation;
     private readonly IDialogService _dialogs;
     private readonly INotificationService _notifications;
@@ -32,20 +50,29 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
     private bool _disposed;
 
     public HistoryViewModel(IHistoryRepository history, IJobService jobs, IMediaInspector inspector,
-        IOperationSettingsSerializer serializer, INavigationService navigation, IDialogService dialogs,
-        INotificationService notifications, IAppLogger logger)
+        IOperationSettingsSerializer serializer, IFilePickerService filePicker, INavigationService navigation,
+        IDialogService dialogs, INotificationService notifications, IAppLogger logger)
     {
         _history = history;
         _jobs = jobs;
         _inspector = inspector;
         _serializer = serializer;
+        _filePicker = filePicker;
         _navigation = navigation;
         _dialogs = dialogs;
         _notifications = notifications;
         _logger = logger;
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         SelectedFilter = Filters[0];
+        SelectedStatus = StatusFilters[0];
     }
+
+    private static readonly JsonSerializerOptions ExportJsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public IReadOnlyList<HistoryFilter> Filters { get; } =
     [
@@ -59,9 +86,31 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
         new(OperationKind.OcrDocument, "OCR document")
     ];
 
+    public IReadOnlyList<HistoryStatusFilter> StatusFilters { get; } =
+    [
+        new(null, "All statuses"),
+        new(JobItemState.Completed, "Completed"),
+        new(JobItemState.Failed, "Failed"),
+        new(JobItemState.Cancelled, "Cancelled")
+    ];
+
+    /// <summary>
+    /// Re-evaluates every localized binding in place without rebuilding the
+    /// item collections, so the current ComboBox selection is preserved.
+    /// </summary>
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var option in Filters) option.RefreshLocalization();
+        foreach (var option in StatusFilters) option.RefreshLocalization();
+        foreach (var item in Items) item.RefreshLocalization();
+        ResultSummary = itemsSummary(Items.Count);
+    }
+
     [ObservableProperty] private ObservableCollection<HistoryItemViewModel> _items = [];
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private HistoryFilter _selectedFilter;
+    [ObservableProperty] private HistoryStatusFilter _selectedStatus;
     [ObservableProperty] private bool _hasItems;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _resultSummary = "Search locally recorded operations";
@@ -71,8 +120,13 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
         IsLoading = true;
         try
         {
-            var entries = await _history.GetRecentAsync(500, string.IsNullOrWhiteSpace(SearchText) ? null : SearchText,
-                SelectedFilter?.Operation);
+            var entries = await _history.QueryAsync(new HistoryQuery
+            {
+                Limit = 500,
+                Search = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText,
+                Operation = SelectedFilter?.Operation,
+                Status = SelectedStatus?.Status
+            });
             Items = new ObservableCollection<HistoryItemViewModel>(entries.Select(e =>
                 new HistoryItemViewModel(e, this)));
             HasItems = Items.Count > 0;
@@ -90,7 +144,10 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
     }
 
     private static string itemsSummary(int count) =>
-        count == 0 ? "No recorded operations" : $"{count} recorded operation{(count == 1 ? "" : "s")} · stored locally";
+        count == 0
+            ? LocalizationService.T("No recorded operations")
+            : LocalizationService.F("{0} · stored locally",
+                LocalizationService.P("Count.RecordedOperation", count));
 
     partial void OnSearchTextChanged(string value)
     {
@@ -114,6 +171,78 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
     }
 
     partial void OnSelectedFilterChanged(HistoryFilter value) => _ = LoadAsync();
+    partial void OnSelectedStatusChanged(HistoryStatusFilter value) => _ = LoadAsync();
+
+    [RelayCommand]
+    private async Task ExportHistoryAsync()
+    {
+        var path = await _filePicker.PickJsonSaveFileAsync($"pixelforge-history-{DateTime.Now:yyyyMMdd}.json");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            var document = await _history.ExportAsync(new HistoryQuery
+            {
+                Limit = 100_000,
+                Search = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText,
+                Operation = SelectedFilter?.Operation,
+                Status = SelectedStatus?.Status
+            }, typeof(App).Assembly.GetName().Version?.ToString(3) ?? "2.0.0");
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document, ExportJsonOptions));
+            _notifications.Notify("History exported",
+                "The export contains local filenames and paths. Review it before sharing.",
+                NotificationSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "History export failed");
+            await _dialogs.ShowErrorAsync("Could not export history", ex.Message, ex.ToString());
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportHistoryAsync()
+    {
+        var path = await _filePicker.PickJsonOpenFileAsync();
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            var file = new FileInfo(path);
+            if (file.Length > 50L * 1024 * 1024)
+            {
+                await _dialogs.ShowErrorAsync("Import file too large", "History imports are limited to 50 MB.");
+                return;
+            }
+
+            var json = await File.ReadAllTextAsync(path);
+            var document = JsonSerializer.Deserialize<HistoryExportDocument>(json, ExportJsonOptions);
+            if (document is null || document.Entries is null)
+            {
+                await _dialogs.ShowErrorAsync("Invalid history file", "The selected file is not a PixelForge history export.");
+                return;
+            }
+
+            if (!await _dialogs.ConfirmAsync("Import history?",
+                    LocalizationService.F(
+                    "Import {0}? Existing matching records will be skipped. Imported records keep their original paths and may refer to files that no longer exist.",
+                    LocalizationService.P("Count.Record", document.Entries.Count)),
+                    "Import", "Cancel"))
+                return;
+
+            var result = await _history.ImportAsync(document);
+            await LoadAsync();
+            await _dialogs.ShowMessageAsync("History imported",
+                $"Imported {result.Imported}, skipped {result.Skipped}, invalid {result.Invalid}.");
+        }
+        catch (JsonException)
+        {
+            await _dialogs.ShowErrorAsync("Invalid history file", "The selected file is not valid PixelForge history JSON.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "History import failed");
+            await _dialogs.ShowErrorAsync("Could not import history", ex.Message, ex.ToString());
+        }
+    }
 
     [RelayCommand]
     private async Task RefreshAsync() => await LoadAsync();
@@ -150,7 +279,7 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
             var request = new JobRequest
             {
                 Operation = entry.Operation,
-                Title = "Repeat · " + entry.Title,
+                Title = LocalizationService.F("Repeat · {0}", entry.Title),
                 Settings = settings,
                 Inputs = [new JobInput { Path = entry.InputPath, Info = info }]
             };
@@ -162,7 +291,9 @@ public sealed partial class HistoryViewModel : ObservableObject, IDisposable
             }
 
             var job = await _jobs.EnqueueAsync(request);
-            _notifications.Notify("Repeat added to queue", job.Title + " · unique output names", NotificationSeverity.Success);
+            _notifications.Notify("Repeat added to queue",
+                LocalizationService.F("{0} · {1}", job.Title, LocalizationService.T("unique output names")),
+                NotificationSeverity.Success);
             _navigation.Navigate("Queue");
         }
         catch (Exception ex)
@@ -199,6 +330,7 @@ public sealed partial class HistoryItemViewModel : ObservableObject
 
     public HistoryEntry Entry { get; }
     public string Title => Entry.OutputFileName ?? Entry.InputFileName ?? "Processed file";
+    public void RefreshLocalization() => OnPropertyChanged(string.Empty);
     public string InputName => Entry.InputFileName ?? "";
     public string OperationText => Entry.Operation switch
     {
@@ -231,13 +363,25 @@ public sealed partial class HistoryItemViewModel : ObservableObject
         _ => Entry.Status.ToString()
     };
     public bool IsSuccess => Entry.Status == JobItemState.Completed;
-    public string TimeText => Entry.CreatedAt.LocalDateTime.ToString("MMM d, HH:mm");
-    public string DurationText => Entry.DurationMs > 0 ? $"{Entry.DurationMs / 1000:0.0}s" : "—";
+    public string TimeText => LocalizationService.FormatDateTime(Entry.CreatedAt, "g");
+    public string DurationText => Entry.DurationMs > 0
+        ? LocalizationService.F("{0}s", LocalizationService.FormatNumber(Entry.DurationMs / 1000, "0.0"))
+        : "-";
     public string SizeText => Entry.OutputBytes is > 0 ? FileSizeConverter.FormatBytes(Entry.OutputBytes.Value) : "—";
     public string InputSizeText => FileSizeConverter.FormatBytes(Entry.InputBytes);
     public bool CanCompare => Entry.Operation is OperationKind.UpscaleAi or OperationKind.UpscaleTraditional or OperationKind.ImageProcess
                               && Entry.InputPath is not null && Entry.OutputPath is not null;
     public string ErrorText => Entry.Error ?? "";
+    public string ProviderText => !string.IsNullOrWhiteSpace(Entry.ActualProvider)
+        ? LocalizationService.F("Provider: {0}", Entry.ActualProvider) +
+          (string.IsNullOrWhiteSpace(Entry.RequestedProvider) ? "" : LocalizationService.F(" (requested {0})", Entry.RequestedProvider))
+        : !string.IsNullOrWhiteSpace(Entry.RequestedProvider)
+            ? LocalizationService.F("Provider requested: {0}", Entry.RequestedProvider)
+            : "";
+    public string ModelText => string.IsNullOrWhiteSpace(Entry.ModelId)
+        ? ""
+        : LocalizationService.F("Model: {0}", Entry.ModelId);
+    public string ErrorDetailsText => Entry.ErrorDetails ?? "";
 
     [RelayCommand]
     private void Open()

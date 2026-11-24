@@ -1,0 +1,73 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="PixelForge"
+      Manufacturer="PixelForge"
+      Version="$(var.Version)"
+      UpgradeCode="{A17E5B90-6C3D-4F2A-9B1E-5D7C8E0F4A21}"
+      InstallerVersion="500"
+      Compressed="yes"
+      Scope="perUserOrMachine">
+
+    <Property Id="INSTALLDESKTOPSHORTCUT" Value="0" Secure="yes" />
+
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer version of PixelForge is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="PixelForgeIcon" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="PixelForgeIcon" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/JuggyBob/PixelForge" />
+    <Property Id="ARPCOMMENTS" Value="Local Windows media studio; no account, upload, or cloud service." />
+
+    <Property Id="INNO_UNINSTALL_EXISTS">
+      <RegistrySearch Id="FindInnoUninstall" Root="HKCU"
+                      Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3D9B62-8B5A-4D68-9C7D-3E2A1F57C410}_is1"
+                      Name="UninstallString" Type="raw" />
+    </Property>
+    <Launch Condition="NOT INNO_UNINSTALL_EXISTS"
+            Message="Uninstall the existing Inno Setup PixelForge before installing this MSI." />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolderLocal" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="PixelForge" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="PixelForgeMenuFolder" Name="PixelForge" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="Payload">
+      <Files Directory="INSTALLFOLDER"
+             Include="!(bindpath.Publish)\**">
+        <Exclude Files="!(bindpath.Publish)\**.pdb" />
+        <Exclude Files="!(bindpath.Publish)\**.lib" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ShortcutsAndArp">
+      <Component Id="StartMenuShortcut" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A01}">
+        <Shortcut Id="StartMenuPixelForge" Directory="PixelForgeMenuFolder"
+                  Name="PixelForge.lnk" Target="[INSTALLFOLDER]PixelForge.exe"
+                  Icon="PixelForgeIcon" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="StartMenu"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="DesktopShortcut" Guid="{C3A1B2D4-5E6F-4A70-8B91-2C3D4E5F6A02}"
+                 Condition="INSTALLDESKTOPSHORTCUT = 1" Transitive="yes">
+        <Shortcut Id="DesktopPixelForge" Directory="DesktopFolder"
+                  Name="PixelForge.lnk" Target="[INSTALLFOLDER]PixelForge.exe"
+                  Icon="PixelForgeIcon" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\PixelForge\Msi" Name="Desktop"
+                       Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main" Title="PixelForge" Level="1">
+      <ComponentGroupRef Id="Payload" />
+      <ComponentGroupRef Id="ShortcutsAndArp" />
+      <ComponentGroupRef Id="ContextMenu" />
+    </Feature>
+  </Package>
+</Wix>

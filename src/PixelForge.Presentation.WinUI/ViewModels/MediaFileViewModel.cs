@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
@@ -7,12 +8,15 @@ using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
 using PixelForge.Presentation.Converters;
+using PixelForge.Presentation.Localization;
 using System.Collections.ObjectModel;
 
 namespace PixelForge.Presentation.ViewModels;
 
-public sealed class FormatItemViewModel
+public sealed class FormatItemViewModel : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public FormatItemViewModel(MediaFormat format)
     {
         Format = format;
@@ -27,13 +31,22 @@ public sealed class FormatItemViewModel
     public bool IsLossy => Format.IsLossy;
     public bool SupportsAlpha => Format.SupportsAlpha;
     public bool SupportsAnimation => Format.SupportsAnimation;
-    public string CategoryText => Category switch
+
+    public void RefreshLocalization()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CategoryText)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Badges)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SearchText)));
+    }
+
+    public string CategoryText => LocalizationService.T(Category switch
     {
         MediaCategory.Image => "Image",
         MediaCategory.Audio => "Audio",
         MediaCategory.Video => "Video",
         _ => "Media"
-    };
+    });
     public string Badges
     {
         get
@@ -54,7 +67,7 @@ public sealed class FormatItemViewModel
     }.Concat(Format.Aliases)).ToLowerInvariant();
 }
 
-public sealed class CollisionOption
+public sealed class CollisionOption : INotifyPropertyChanged
 {
     public CollisionOption(CollisionPolicy policy, string label, string description)
     {
@@ -63,9 +76,18 @@ public sealed class CollisionOption
         Description = description;
     }
 
+    public event PropertyChangedEventHandler? PropertyChanged;
     public CollisionPolicy Policy { get; }
     public string Label { get; }
     public string Description { get; }
+    public string DisplayLabel => LocalizationService.T(Label);
+    public string DisplayDescription => LocalizationService.T(Description);
+
+    public void RefreshLocalization()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayLabel)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayDescription)));
+    }
 }
 
 public sealed record ValidationIssueViewModel(string Message, ValidationSeverity Severity)

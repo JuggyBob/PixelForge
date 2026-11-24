@@ -5,7 +5,9 @@ using Microsoft.UI.Dispatching;
 using PixelForge.Domain;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
+using Loc = PixelForge.Presentation.Localization.Loc;
 
 namespace PixelForge.Presentation.ViewModels;
 
@@ -26,6 +28,8 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
     private readonly ConverterStagingSession _session;
     private readonly DispatcherQueue _dispatcher;
     private CancellationTokenSource? _validationCts;
+    private FolderScanResult? _lastScanResult;
+    private int _lastScanDuplicates;
     private bool _initialized;
     private bool _updatingCategory;
     private bool _queueing;
@@ -70,6 +74,34 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
     public EbookWorkspaceViewModel Ebooks { get; }
     public ArchiveWorkspaceViewModel Archives { get; }
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        Image.RefreshLocalization();
+        Audio.RefreshLocalization();
+        Video.RefreshLocalization();
+        Documents.RefreshLocalization();
+        Ebooks.RefreshLocalization();
+        Archives.RefreshLocalization();
+        UpdateEngineStatus();
+        UpdateSummary();
+        if (!IsScanningFolder && _lastScanResult is not null)
+        {
+            var summary = LocalizationService.ScanSummary(_lastScanResult);
+            if (_lastScanDuplicates > 0)
+                summary += " · " + Loc.F("{0} already staged", _lastScanDuplicates);
+            ScanSummary = summary;
+        }
+    }
+
+    private void UpdateEngineStatus()
+    {
+        if (!_registry.IsInitialized)
+            EngineStatus = Loc.T("Starting local engines…");
+        else
+            EngineStatus = Loc.T("Engines ready · local processing");
+    }
+
     [ObservableProperty] private WorkspaceViewModel _currentWorkspace;
     [ObservableProperty] private MediaCategory _selectedCategory = MediaCategory.Image;
     [ObservableProperty] private bool _isImagesSelected = true;
@@ -106,16 +138,15 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         {
             if (!_registry.IsInitialized) await _registry.InitializeAsync();
             LoadFormats();
-            IsEngineReady = _registry.Engines.Any(e => e.EngineId == EngineIds.Images && e.IsAvailable);            EngineStatus = _registry.IsInitialized
-                ? "Engines ready · local processing"
-                : "Starting local engines…";
+            IsEngineReady = _registry.Engines.Any(e => e.EngineId == EngineIds.Images && e.IsAvailable);
+            UpdateEngineStatus();
             if (preferredCategory is { } category) SelectCategory(category);
             UpdateSummary();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Converter initialization failed");
-            EngineStatus = "Engine initialization failed";
+            EngineStatus = Loc.T("Engine initialization failed");
             await _dialogs.ShowErrorAsync("Converter unavailable",
                 "The processing engines could not be initialized.", ex.ToString());
         }
@@ -212,7 +243,8 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
             if (skipped.Count > 0)
             {
                 _notifications.Notify("Some files were skipped",
-                    $"{skipped.Count} file(s) were not compatible with the current workspace.", NotificationSeverity.Warning);
+                    LocalizationService.P("Converter.IncompatibleFiles", skipped.Count),
+                    NotificationSeverity.Warning);
             }
 
             SelectCategory(target);
@@ -323,6 +355,28 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         ScheduleValidation();
     }
 
+    public async Task AddFolderAsCategoryAsync(string path, MediaCategory category)
+    {
+        if (!Directory.Exists(path)) return;
+        if (!_registry.IsInitialized) await InitializeAsync(category);
+        SelectCategory(category);
+        var workspace = _session.WorkspaceFor(category);
+        var result = await _scanner.ScanAsync(new FolderScanRequest
+        {
+            FolderPath = Path.GetFullPath(path),
+            Recursive = true,
+            PreserveFolderStructure = true,
+            TargetCategory = category,
+            ExcludeDirectory = workspace.OutputDirectory
+        });
+        var files = result.IncludedFiles
+            .Where(f => f.Info is not null)
+            .Select(f => f.Path)
+            .ToList();
+        if (files.Count > 0)
+            await AddFilesAsync(files, category);
+    }
+
     [RelayCommand]
     private async Task BrowseFolderAsync()
     {
@@ -392,13 +446,16 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         var total = _session.TotalFileCount;
         if (total == 0) return;
         if (!await _dialogs.ConfirmAsync("Clear all staged files?",
-                $"Remove {CountLabel(total, "file", "files")} from every Converter category? No files on disk will be deleted.",
+                Loc.F("Remove {0} from every Converter category? No files on disk will be deleted.",
+                    CountLabel(total, "file", "files")),
                 "Clear all", "Keep files", destructive: true)) return;
         _session.ClearAll();
         ScanSkipped.Clear();
         HasScanSkipped = false;
         HasScanSummary = false;
         ScanSummary = "";
+        _lastScanResult = null;
+        _lastScanDuplicates = 0;
         UpdateSummary();
         ScheduleValidation();
     }
@@ -414,14 +471,15 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
 
         IsScanningFolder = true;
         HasScanSummary = true;
-        ScanSummary = "Scanning folder…";
+        ScanSummary = Loc.T("Scanning folder…");
         ScanSkipped.Clear();
         HasScanSkipped = false;
         try
         {
             var progress = new Progress<int>(count =>
             {
-                _dispatcher.TryEnqueue(() => ScanSummary = $"Scanning folder… {count} files checked");
+                _dispatcher.TryEnqueue(() => ScanSummary =
+                    LocalizationService.P("Scan.CheckedFiles", count));
             });
             var result = await _scanner.ScanAsync(new FolderScanRequest
             {
@@ -447,9 +505,11 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
                 ScanSkipped.Add(new ScanSkipItem(file.RelativePath, file.Reason ?? "Skipped", !file.IsSupported));
             HasScanSkipped = ScanSkipped.Count > 0;
 
-            var summary = result.Summary;
-            if (duplicates > 0) summary += $" · {duplicates} already staged";
-            if (result.Warning is not null) summary += $" · {result.Warning}";
+            var summary = LocalizationService.ScanSummary(result);
+            if (duplicates > 0)
+                summary += " · " + Loc.F("{0} already staged", duplicates);
+            _lastScanResult = result;
+            _lastScanDuplicates = duplicates;
             ScanSummary = summary;
             HasScanSummary = true;
 
@@ -470,12 +530,12 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         }
         catch (OperationCanceledException)
         {
-            ScanSummary = "Folder scan cancelled.";
+            ScanSummary = Loc.T("Folder scan cancelled.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Converter folder scan failed");
-            ScanSummary = "Folder scan failed.";
+            ScanSummary = Loc.T("Folder scan failed.");
             await _dialogs.ShowErrorAsync("Folder scan failed", ex.Message, ex.ToString());
         }
         finally
@@ -529,14 +589,14 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
                 if (invalid.Count > 1)
                 {
                     var details = string.Join("\n\n", invalid.Skip(1).Select(i =>
-                        $"{i.Workspace.CategoryTitle}: {i.Validation.Summary}"));
+                        i.Workspace.CategoryTitle + ": " + LocalizationService.ValidationSummary(i.Validation)));
                     await _dialogs.ShowMessageAsync("Other categories also need attention", details);
                 }
                 return;
             }
 
             var warnings = valid.SelectMany(v => v.Validation.Warnings.Select(w =>
-                $"{v.Workspace.CategoryTitle}: {w.Message}")).ToList();
+                v.Workspace.CategoryTitle + ": " + LocalizationService.T(w.Message))).ToList();
             if (warnings.Count > 0)
             {
                 var proceed = await _dialogs.ConfirmAsync("Review warnings",
@@ -575,12 +635,15 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
             {
                 _session.MarkQueued(queued);
                 _notifications.Notify("Added to processing queue",
-                    $"{CountLabel(queuedFiles, "file", "files")} across {CountLabel(queued.Count, "category", "categories")}.",
+                    Loc.F("{0} across {1}.",
+                        CountLabel(queuedFiles, "file", "files"),
+                        CountLabel(queued.Count, "category", "categories")),
                     NotificationSeverity.Success);
             }
 
             var notQueued = new List<string>();
-            notQueued.AddRange(invalid.Select(i => $"{i.Workspace.CategoryTitle}: {i.Validation.Summary}"));
+            notQueued.AddRange(invalid.Select(i =>
+                i.Workspace.CategoryTitle + ": " + LocalizationService.ValidationSummary(i.Validation)));
             notQueued.AddRange(enqueueFailures);
             if (notQueued.Count > 0)
             {
@@ -682,10 +745,10 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         var total = _session.TotalFileCount;
         var categories = _session.Workspaces.Count(w => w.Files.Count > 0);
         SelectionHint = total == 0
-            ? "Import files to begin"
+            ? Loc.T("Import files to begin")
             : categories > 1
-                ? $"{CountLabel(total, "file", "files")} staged · {categories} categories"
-                : $"{CountLabel(total, "file", "files")} staged";
+                ? Loc.F("{0} staged · {1} categories", CountLabel(total, "file", "files"), categories)
+                : Loc.F("{0} staged", CountLabel(total, "file", "files"));
     }
 
     private void UpdateSummary()
@@ -695,10 +758,10 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
         var total = _session.TotalFileCount;
         var categories = _session.Workspaces.Count(w => w.Files.Count > 0);
         SelectionHint = total == 0
-            ? "Import files to begin"
+            ? Loc.T("Import files to begin")
             : categories > 1
-                ? $"{CountLabel(total, "file", "files")} staged · {categories} categories"
-                : $"{CountLabel(total, "file", "files")} staged";
+                ? Loc.F("{0} staged · {1} categories", CountLabel(total, "file", "files"), categories)
+                : Loc.F("{0} staged", CountLabel(total, "file", "files"));
     }
 
     private string BuildCategorySummary() =>
@@ -711,8 +774,22 @@ public sealed partial class ConverterViewModel : ObservableObject, IDisposable
             CountLabel(Archives.Files.Count, "archive", "archives"));
 
 
-    private static string CountLabel(int count, string singular, string plural) =>
-        count == 1 ? $"1 {singular}" : $"{count} {plural}";
+    private static string CountLabel(int count, string singular, string plural)
+    {
+        var key = singular switch
+        {
+            "file" => "Count.File",
+            "category" => "Count.Category",
+            "image" => "Count.Image",
+            "audio" => "Count.Audio",
+            "video" => "Count.Video",
+            "doc" => "Count.Document",
+            "e-book" => "Count.Ebook",
+            "archive" => "Count.Archive",
+            _ => "Count." + singular
+        };
+        return LocalizationService.P(key, count);
+    }
     public void Dispose()
     {
         if (_disposed) return;

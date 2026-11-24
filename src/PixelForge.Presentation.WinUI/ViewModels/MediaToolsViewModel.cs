@@ -8,6 +8,7 @@ using PixelForge.Domain;
 using PixelForge.Domain.Capabilities;
 using PixelForge.Domain.Interfaces;
 using PixelForge.Domain.Models;
+using PixelForge.Presentation.Localization;
 using PixelForge.Presentation.Services;
 
 namespace PixelForge.Presentation.ViewModels;
@@ -176,6 +177,29 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
         new("none", "No audio")
     ];
 
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(string.Empty);
+        foreach (var tool in ToolOptions) tool.RefreshLocalization();
+        foreach (var option in CollisionOptions) option.RefreshLocalization();
+        foreach (var option in NoiseMethods) option.RefreshLocalization();
+        foreach (var option in MetadataModes) option.RefreshLocalization();
+        foreach (var option in CompressionPresets) option.RefreshLocalization();
+        foreach (var option in SubtitleModes) option.RefreshLocalization();
+        foreach (var option in SampleRates) option.RefreshLocalization();
+        foreach (var option in ChannelOptions) option.RefreshLocalization();
+        foreach (var option in AudioBitrates) option.RefreshLocalization();
+        foreach (var option in ExecutionProviders) option.RefreshLocalization();
+        foreach (var option in WatermarkKinds) option.RefreshLocalization();
+        foreach (var option in VideoCodecOptions) option.RefreshLocalization();
+        foreach (var option in VideoAudioCodecOptions) option.RefreshLocalization();
+        foreach (var format in Formats) format.RefreshLocalization();
+        UpdateSummary();
+        if (_lastValidation is not null) SetValidation(_lastValidation);
+    }
+
+    private ValidationResult? _lastValidation;
+
     [ObservableProperty] private MediaCategory _category = MediaCategory.Audio;
     [ObservableProperty] private MediaToolDefinition _selectedTool;
     [ObservableProperty] private FormatItemViewModel? _selectedFormat;
@@ -299,7 +323,7 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
 
     public bool HasFiles => Files.Count > 0;
     public bool HasIssues => Issues.Count > 0;
-    public string FileCountText => Files.Count == 1 ? "1 file" : $"{Files.Count} files";
+    public string FileCountText => LocalizationService.P("Count.File", Files.Count);
     public bool CanQueue => HasFiles && !HasValidationErrors && SelectedFormat is not null;
     public bool IsAudioCategory => Category == MediaCategory.Audio;
     public bool IsImageCategory => Category == MediaCategory.Image;
@@ -938,18 +962,20 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
     {
         if (SelectedTool is null)
         {
-            Summary = "Choose a tool and add files.";
-            StatusText = "Choose a tool and add files.";
+            Summary = Loc.T("Choose a tool and add files.");
+            StatusText = Loc.T("Choose a tool and add files.");
             CompressionEstimate = "";
             return;
         }
 
+        var toolLabel = Loc.T(SelectedTool.Label);
+        var toolDescription = Loc.T(SelectedTool.Description);
         Summary = Files.Count == 0
-            ? $"{SelectedTool.Label} · add files to begin"
-            : $"{FileCountText} → {SelectedFormat?.ExtensionUpper ?? "auto"} · {SelectedTool.Label}";
+            ? Loc.F("{0} · add files to begin", toolLabel)
+            : Loc.F("{0} → {1} · {2}", FileCountText, SelectedFormat?.ExtensionUpper ?? "auto", toolLabel);
         StatusText = Files.Count == 0
-            ? SelectedTool.Description
-            : $"{SelectedTool.Description} Output: {OutputDirectory}";
+            ? toolDescription
+            : Loc.F("{0} Output: {1}", toolDescription, OutputDirectory);
         if (Files.Count == 0)
         {
             CompressionEstimate = "";
@@ -959,11 +985,13 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
             var duration = Files[0].Info.DurationSeconds!.Value;
             var bits = Math.Max(1, TargetSizeMb) * 1024 * 1024 * 8 * 0.98;
             var videoKbps = Math.Max(100, (int)Math.Round(bits / duration / 1000 - VideoAudioBitrateKbps - 24));
-            CompressionEstimate = $"Estimated video bitrate ≈ {videoKbps:N0} kbps for {duration:0.0}s · preset {SelectedCompressionPreset?.Label ?? "Balanced"}";
+            CompressionEstimate = Loc.F("Estimated video bitrate ≈ {0} kbps for {1}s · preset {2}",
+                videoKbps, duration.ToString("0.0"), Loc.T(SelectedCompressionPreset?.Label ?? "Balanced"));
         }
         else if (IsImageOptimize)
         {
-            CompressionEstimate = $"Source size: {Files[0].SizeText}. Output size appears in History after processing.";
+            CompressionEstimate = Loc.F("Source size: {0}. Output size appears in History after processing.",
+                Files[0].SizeText);
         }
         else
         {
@@ -1107,6 +1135,7 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
 
     private void SetValidation(ValidationResult? validation)
     {
+        _lastValidation = validation;
         Issues.Clear();
         if (validation is null)
         {
@@ -1120,7 +1149,7 @@ public sealed partial class MediaToolsViewModel : ObservableObject, IDisposable
                 Issues.Add(new ValidationIssueViewModel(issue.Message, issue.Severity));
             HasValidationErrors = validation.Errors.Count > 0;
             HasValidationWarnings = validation.Warnings.Count > 0;
-            ValidationSummary = validation.Summary;
+            ValidationSummary = LocalizationService.ValidationSummary(validation);
         }
 
         OnPropertyChanged(nameof(CanQueue));

@@ -6,18 +6,22 @@ using Microsoft.UI.Xaml.Navigation;
 using PixelForge.Presentation.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
+using PixelForge.Presentation.Localization;
 
 namespace PixelForge.Presentation.Views;
 
-public sealed partial class OcrPage : Page
+public sealed partial class OcrPage : Page, ILocalizationAwarePage
 {
     public OcrViewModel ViewModel { get; }
+
+    public void RefreshLocalization() => ViewModel.RefreshLocalization();
 
     public OcrPage()
     {
         ViewModel = App.Services.GetRequiredService<OcrViewModel>();
         InitializeComponent();
         DataContext = ViewModel;
+        LocalizationPageRegistry.Register(this);
     }
 
     protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -58,7 +62,7 @@ public sealed partial class OcrPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Copy;
-            e.DragUIOverride.Caption = "Add pages or scan a folder";
+            e.DragUIOverride.Caption = LocalizationService.T("Add pages or scan a folder");
             e.DragUIOverride.IsContentVisible = true;
         }
     }

@@ -63,6 +63,58 @@ public sealed class FFmpegEngineTests
     }
 
     [Fact]
+    public async Task Mp3_converts_to_m4a_with_aac_using_the_real_backend()
+    {
+        var source = RepoPaths.Fixture("tone.mp3");
+        Assert.True(File.Exists(source), $"Fixture missing: {source}");
+
+        using var paths = new TempAppPaths();
+        var engine = CreateEngine(paths);
+        var capability = await engine.ProbeAsync();
+        Assert.True(capability.IsAvailable, capability.Error);
+
+        var info = await engine.TryInspectAsync(source, MediaCategory.Audio);
+        Assert.NotNull(info);
+        Assert.True(info!.IsReadable, info.Error);
+
+        var settings = new AudioConversionSettings
+        {
+            OutputFormatId = "m4a",
+            CodecId = "aac",
+            EncoderId = "aac",
+            BitrateKbps = 192
+        };
+        var request = new ProcessingRequest
+        {
+            JobId = Guid.NewGuid(),
+            ItemId = Guid.NewGuid(),
+            Operation = OperationKind.AudioConvert,
+            Settings = settings,
+            InputPath = source,
+            TempOutputPath = Path.Combine(paths.TempDirectory, "tone.m4a"),
+            OutputFormatId = "m4a",
+            TempDirectory = paths.TempDirectory,
+            InputInfo = info
+        };
+
+        var validation = await engine.ValidateAsync(request);
+        Assert.True(validation.IsValid, validation.Summary);
+
+        var result = await engine.ProcessAsync(request, new Progress<ProcessingProgress>());
+        Assert.True(result.Success, result.Error + Environment.NewLine + result.ErrorDetails);
+        Assert.True(File.Exists(request.TempOutputPath));
+        Assert.Equal(".m4a", Path.GetExtension(request.TempOutputPath), ignoreCase: true);
+
+        var verification = await engine.VerifyOutputAsync(request, request.TempOutputPath);
+        Assert.True(verification.IsValid, verification.Summary);
+        Assert.NotNull(verification.ActualInfo);
+        var actual = verification.ActualInfo!;
+        Assert.Equal(MediaCategory.Audio, actual.Category);
+        Assert.Equal("aac", actual.AudioCodec?.ToLowerInvariant());
+        Assert.InRange(actual.DurationSeconds ?? 0, 0.5, 5.0);
+    }
+
+    [Fact]
     public async Task H264_mp4_remuxes_to_mkv_as_stream_copy()
     {
         var source = RepoPaths.Fixture("clip-h264.mp4");

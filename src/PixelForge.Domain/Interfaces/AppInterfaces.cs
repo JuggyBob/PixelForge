@@ -65,6 +65,8 @@ public interface IModelManager
         CancellationToken cancellationToken = default);
     Task<ModelDownloadResult> InstallFromFileAsync(string filePath, string? modelId = null,
         CancellationToken cancellationToken = default);
+    Task DiscardPartialAsync(string modelId, CancellationToken cancellationToken = default);
+    bool HasPartialDownload(string modelId);
     Task<bool> RemoveAsync(string modelId, CancellationToken cancellationToken = default);
     Task<InstalledModel?> ValidateAsync(string modelId, CancellationToken cancellationToken = default);
     Task<string?> ResolveModelPathAsync(string modelId, CancellationToken cancellationToken = default);
@@ -132,8 +134,29 @@ public interface IOcrModelManager
         IProgress<OcrModelDownloadProgress>? progress = null, CancellationToken cancellationToken = default);
     Task<InstalledOcrModel?> ValidateAsync(string modelId, CancellationToken cancellationToken = default);
     Task<bool> RemoveAsync(string modelId, CancellationToken cancellationToken = default);
+    Task DiscardPartialAsync(string modelId, CancellationToken cancellationToken = default);
+    bool HasPartialDownload(string modelId);
     Task<InstalledOcrModel?> ResolveAsync(string modelId, CancellationToken cancellationToken = default);
 }
+
+public interface IOcrReviewService
+{
+    Task<OcrReviewResult> RecognizeAsync(OcrSettings settings,
+        IProgress<ProcessingProgress>? progress = null, CancellationToken cancellationToken = default);
+}
+
+public sealed record OcrReviewResult
+{
+    public bool Success { get; init; }
+    public string Markdown { get; init; } = "";
+    public string Provider { get; init; } = "";
+    public string ModelId { get; init; } = "";
+    public string RuntimeVersion { get; init; } = "";
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+    public string? Error { get; init; }
+    public string? ErrorDetails { get; init; }
+}
+
 
 public interface IAppLogger
 {

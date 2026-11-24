@@ -249,6 +249,7 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
         long outputFrames = 0;
         var totalFrames = duration > 0 ? (long)Math.Round(duration * sourceFps) : 0;
         var sceneCuts = 0;
+        ExecutionProviderKind? actualProvider = null;
 
         try
         {
@@ -263,6 +264,7 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
                         settings.ImageModelId, settings.ExecutionProvider, settings.TileSize, settings.TileOverlap,
                         cancellationToken);
                     processed = upscaled.Rgb24;
+                    actualProvider ??= upscaled.Provider;
                     if (upscaled.Warning is not null && !warnings.Contains(upscaled.Warning))
                         warnings.Add(upscaled.Warning);
                     if (upscaled.Width != outputWidth || upscaled.Height != outputHeight)
@@ -278,9 +280,18 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
                     processed = ResizeRgbBilinear(currentBuffer, sourceWidth, sourceHeight, outputWidth, outputHeight);
                 }
 
+                var previousSource = processed;
+                var isCut = previous is not null &&
+                            (settings.EnableInterpolation || settings.EnableTemporalStability) &&
+                            IsSceneCut(previous, processed, outputWidth, outputHeight);
+                if (settings.EnableTemporalStability && previous is not null && !isCut)
+                {
+                    processed = StabilizeTemporal(previous, processed, outputWidth, outputHeight,
+                        settings.TemporalStabilityStrength);
+                }
+
                 if (previous is not null && settings.EnableInterpolation)
                 {
-                    var isCut = IsSceneCut(previous, processed, outputWidth, outputHeight);
                     if (isCut)
                     {
                         sceneCuts++;
@@ -299,6 +310,7 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
                                 settings.ExecutionProvider, cancellationToken);
                             if (interpolated.Warning is not null && !warnings.Contains(interpolated.Warning))
                                 warnings.Add(interpolated.Warning);
+                            actualProvider ??= interpolated.Provider;
                             await WriteFrameAsync(encoderProcess.StandardInput.BaseStream, interpolated.Rgb24,
                                 cancellationToken);
                             outputFrames++;
@@ -308,7 +320,7 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
 
                 await WriteFrameAsync(encoderProcess.StandardInput.BaseStream, processed, cancellationToken);
                 outputFrames++;
-                previous = processed;
+                previous = previousSource;
                 currentBuffer = ReferenceEquals(currentBuffer, bufferA) ? bufferB : bufferA;
 
                 var fraction = totalFrames > 0 ? Math.Clamp(inputFrames / (double)totalFrames, 0, 1) : -1;
@@ -344,6 +356,8 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
 
             if (sceneCuts > 0)
                 warnings.Add($"{sceneCuts} scene cut{(sceneCuts == 1 ? "" : "s")} were detected; frames were duplicated across the cut instead of interpolated.");
+            if (settings.EnableTemporalStability)
+                warnings.Add("Optional temporal stability was applied with motion-adaptive blending; moving edges retain the current frame.");
 
             var verification = await VerifyOutputAsync(request, request.TempOutputPath, cancellationToken);
             if (!verification.IsValid)
@@ -352,7 +366,24 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
             var bytes = new FileInfo(request.TempOutputPath).Length;
             progress.Report(ProcessingProgress.Percent(1, "Done"));
             return ProcessingResult.Ok(request.TempOutputPath, verification.ActualInfo, bytes, stopwatch.Elapsed,
-                verification, warnings);
+                    verification, warnings)
+                with
+                {
+                    RequestedProvider = settings.ExecutionProvider.ToString(),
+                    ActualProvider = actualProvider is null
+                        ? "CPU (FFmpeg pipeline only)"
+                        : (actualProvider == ExecutionProviderKind.DirectML ? "DirectML (GPU)" : "CPU"),
+                    FallbackReason = settings.ExecutionProvider == ExecutionProviderKind.DirectML &&
+                                     actualProvider != ExecutionProviderKind.DirectML
+                        ? "DirectML was requested but the frame pipeline ran on the CPU."
+                        : null,
+                    ModelId = string.Join(" + ", new[]
+                    {
+                        settings.EnableSuperResolution ? settings.ImageModelId : null,
+                        settings.EnableInterpolation ? settings.InterpolationModelId : null
+                    }.Where(id => !string.IsNullOrWhiteSpace(id))),
+                    RuntimeVersion = "FFmpeg + ONNX Runtime"
+                };
         }
         catch (OperationCanceledException)
         {
@@ -525,6 +556,39 @@ public sealed class VideoUpscalingEngine : IProcessingEngine
     {
         await stream.WriteAsync(frame.AsMemory(0, frame.Length), cancellationToken);
         await stream.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Motion-adaptive temporal stabilization. Only pixels whose local luma
+    /// difference is small are blended; moving edges remain the current frame.
+    /// Scene cuts are handled by the caller and reset the blend.
+    /// </summary>
+    private static byte[] StabilizeTemporal(byte[] previous, byte[] current, int width, int height, int strength)
+    {
+        if (previous.Length != current.Length || width <= 0 || height <= 0) return current;
+        var amount = Math.Clamp(strength, 0, 100) / 100.0 * 0.55;
+        if (amount <= 0) return current;
+        var output = new byte[current.Length];
+        const double threshold = 20.0;
+        for (var i = 0; i < current.Length; i += 3)
+        {
+            var lumaPrevious = (previous[i] * 299 + previous[i + 1] * 587 + previous[i + 2] * 114) / 1000.0;
+            var lumaCurrent = (current[i] * 299 + current[i + 1] * 587 + current[i + 2] * 114) / 1000.0;
+            var difference = Math.Abs(lumaPrevious - lumaCurrent);
+            if (difference >= threshold)
+            {
+                output[i] = current[i];
+                output[i + 1] = current[i + 1];
+                output[i + 2] = current[i + 2];
+                continue;
+            }
+
+            var blend = amount * (1.0 - difference / threshold);
+            output[i] = (byte)Math.Clamp((int)Math.Round(current[i] * (1 - blend) + previous[i] * blend), 0, 255);
+            output[i + 1] = (byte)Math.Clamp((int)Math.Round(current[i + 1] * (1 - blend) + previous[i + 1] * blend), 0, 255);
+            output[i + 2] = (byte)Math.Clamp((int)Math.Round(current[i + 2] * (1 - blend) + previous[i + 2] * blend), 0, 255);
+        }
+        return output;
     }
 
     private static bool IsSceneCut(byte[] first, byte[] second, int width, int height)
